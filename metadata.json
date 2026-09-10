@@ -1,0 +1,8 @@
+{
+  "name": "PrintFood",
+  "description": "Sistema ágil de vendas e emissão de fichas para eventos, barracas e praças de alimentação, com operação rápida para telas touch e painel de retirada.",
+  "requestFramePermissions": [],
+  "majorCapabilities": [
+    "MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"
+  ]
+}
