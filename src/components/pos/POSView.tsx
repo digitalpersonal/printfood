@@ -1,5 +1,5 @@
 import React, { useState, useMemo, useEffect } from 'react';
-import { Search, Plus, Minus, DollarSign, ShoppingBag, Users, Smartphone, Monitor, Printer } from 'lucide-react';
+import { Search, Plus, Minus, DollarSign, ShoppingBag, Users, Smartphone, Monitor, Printer, X } from 'lucide-react';
 import { Product, Category, Business, PaymentMethod, Order, Attendant, PrinterConfig } from '../../types';
 import { supabaseService } from '../../services/supabaseService';
 import { PaymentModal } from './PaymentModal';
@@ -16,8 +16,28 @@ interface POSViewProps {
 export const POSView: React.FC<POSViewProps> = ({ business, categories, products, onOrderCompleted }) => {
   const [selectedCatId, setSelectedCatId] = useState<string>('all');
   const [searchQuery, setSearchQuery] = useState('');
-  const [cart, setCart] = useState<{ product: Product; quantity: number }[]>([]);
+  // Cart State (Persisted in localStorage)
+  const [cart, setCart] = useState<{ product: Product; quantity: number }[]>(() => {
+    const saved = localStorage.getItem('printfood_local_cart');
+    return saved ? JSON.parse(saved) : [];
+  });
+
+  useEffect(() => {
+    localStorage.setItem('printfood_local_cart', JSON.stringify(cart));
+  }, [cart]);
   const [isPaymentOpen, setIsPaymentOpen] = useState(false);
+  const [cartBounce, setCartBounce] = useState(false);
+  const [lastAddedId, setLastAddedId] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (cartBounce) {
+      const timer = setTimeout(() => {
+        setCartBounce(false);
+        setLastAddedId(null);
+      }, 350);
+      return () => clearTimeout(timer);
+    }
+  }, [cartBounce]);
   const [completedOrder, setCompletedOrder] = useState<Order | null>(null);
   const [completedItems, setCompletedItems] = useState<{ name: string; quantity: number; unitPrice: number; total: number }[]>([]);
   
@@ -62,6 +82,8 @@ export const POSView: React.FC<POSViewProps> = ({ business, categories, products
       }
       return [...prev, { product, quantity: 1 }];
     });
+    setLastAddedId(product.id);
+    setCartBounce(true);
   };
 
   const handleUpdateQty = (productId: string, delta: number) => {
@@ -130,11 +152,30 @@ export const POSView: React.FC<POSViewProps> = ({ business, categories, products
 
   const formatMoney = (val: number) => `R$ ${val.toFixed(2).replace('.', ',')}`;
 
+  // Color map for categories
+  const categoryColors = useMemo(() => {
+    const pallete = [
+      { bg: 'bg-blue-950/45 hover:bg-blue-950/60', border: 'border-blue-700/50', text: 'text-blue-400' },
+      { bg: 'bg-emerald-950/45 hover:bg-emerald-950/60', border: 'border-emerald-700/50', text: 'text-emerald-400' },
+      { bg: 'bg-purple-950/45 hover:bg-purple-950/60', border: 'border-purple-700/50', text: 'text-purple-400' },
+      { bg: 'bg-rose-950/45 hover:bg-rose-950/60', border: 'border-rose-700/50', text: 'text-rose-400' },
+      { bg: 'bg-amber-950/45 hover:bg-amber-950/60', border: 'border-amber-700/50', text: 'text-amber-400' },
+      { bg: 'bg-teal-950/45 hover:bg-teal-950/60', border: 'border-teal-700/50', text: 'text-teal-400' },
+      { bg: 'bg-indigo-950/45 hover:bg-indigo-950/60', border: 'border-indigo-700/50', text: 'text-indigo-400' },
+      { bg: 'bg-fuchsia-950/45 hover:bg-fuchsia-950/60', border: 'border-fuchsia-700/50', text: 'text-fuchsia-400' },
+    ];
+    const map: Record<string, typeof pallete[0]> = {};
+    categories.forEach((cat, index) => {
+      map[cat.id] = pallete[index % pallete.length];
+    });
+    return map;
+  }, [categories]);
+
   return (
-    <div className="flex-1 flex flex-col lg:flex-row h-[calc(100vh-60px)] overflow-hidden">
+    <div className="flex-1 flex flex-col lg:flex-row bg-neutral-950">
       
       {/* CATEGORIES SIDEBAR (Touch Pills) */}
-      <div className="w-full lg:w-56 bg-neutral-900 border-r border-neutral-800 p-3 overflow-x-auto lg:overflow-y-auto flex lg:flex-col gap-2 shrink-0 no-scrollbar">
+      <div className="w-full lg:w-56 bg-neutral-900 border-r border-neutral-800 p-3 overflow-x-auto lg:overflow-y-auto flex lg:flex-col gap-2 shrink-0 no-scrollbar lg:sticky lg:top-4 lg:h-[calc(100vh-2rem)]">
         <button
           onClick={() => setSelectedCatId('all')}
           className={`px-4 py-3 rounded-2xl font-extrabold text-sm text-left transition whitespace-nowrap shrink-0 ${
@@ -156,9 +197,9 @@ export const POSView: React.FC<POSViewProps> = ({ business, categories, products
         ))}
       </div>
 
-      {/* PRODUCTS GRID */}
+      {/* PRODUCTS AREA */}
       <div className="flex-1 flex flex-col min-w-0 bg-neutral-950">
-        <div className="p-3 sm:p-4 border-b border-neutral-900 flex flex-col sm:flex-row items-stretch sm:items-center gap-3">
+        <div className="p-3 sm:p-4 border-b border-neutral-900 flex flex-col sm:flex-row items-stretch sm:items-center gap-3 shrink-0">
           <div className="relative flex-1">
             <Search className="absolute left-4 top-3.5 w-5 h-5 text-neutral-500" />
             <input 
@@ -166,8 +207,17 @@ export const POSView: React.FC<POSViewProps> = ({ business, categories, products
               placeholder="Buscar produto pelo nome..." 
               value={searchQuery}
               onChange={e => setSearchQuery(e.target.value)}
-              className="w-full bg-neutral-900 border border-neutral-800 rounded-xl pl-12 pr-4 py-3 text-white focus:border-orange-500 focus:outline-none text-sm font-medium"
+              className="w-full bg-neutral-900 border border-neutral-800 rounded-xl pl-12 pr-10 py-3 text-white focus:border-orange-500 focus:outline-none text-sm font-medium"
             />
+            {searchQuery && (
+              <button 
+                onClick={() => setSearchQuery('')}
+                className="absolute right-3 top-3 p-1 rounded-lg hover:bg-neutral-800 text-neutral-500 hover:text-white transition"
+                title="Limpar busca"
+              >
+                <X className="w-4 h-4" />
+              </button>
+            )}
           </div>
 
           {/* ATENDENTE & MODO DA ESTAÇÃO */}
@@ -223,25 +273,35 @@ export const POSView: React.FC<POSViewProps> = ({ business, categories, products
           </div>
         </div>
         
-        <div className="flex-1 p-4 overflow-y-auto">
-          <div className="grid grid-cols-2 md:grid-cols-3 xl:grid-cols-4 gap-3">
+        <div className="p-3">
+          <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-3">
             {filteredProducts.map(p => {
               const inCart = cart.find(i => i.product.id === p.id);
+              const catColor = p.category_id && categoryColors[p.category_id]
+                ? categoryColors[p.category_id]
+                : { bg: 'bg-neutral-900 hover:bg-neutral-850', border: 'border-neutral-800', text: 'text-orange-500' };
+              const isJustAdded = p.id === lastAddedId;
               return (
                 <button
                   key={p.id}
                   onClick={() => handleAdd(p)}
-                  className={`relative p-4 rounded-2xl border text-left flex flex-col justify-between min-h-[120px] transition active:scale-95 cursor-pointer ${
-                    inCart ? 'bg-orange-950/20 border-orange-500 shadow-md' : 'bg-neutral-900 border-neutral-800 hover:border-neutral-700'
-                  }`}
+                  className={`relative p-3 rounded-xl border text-left flex flex-col justify-center transition-all duration-205 active:scale-95 cursor-pointer min-h-[72px] ${
+                    catColor.bg
+                  } ${
+                    inCart 
+                      ? 'border-orange-500 shadow-md ring-2 ring-orange-500/50 bg-orange-950/20' 
+                      : catColor.border
+                  } ${isJustAdded ? 'scale-105 border-emerald-500 ring-4 ring-emerald-500/30' : ''}`}
                 >
                   {inCart && (
-                    <span className="absolute top-2 right-2 bg-orange-600 text-white text-xs font-black px-2 py-0.5 rounded-full">
+                    <span className={`absolute top-2 right-2 bg-orange-600 text-white text-xs font-black px-2 py-0.5 rounded-full z-10 transition-transform duration-200 ${
+                      isJustAdded ? 'scale-135 bg-emerald-500 rotate-6' : 'scale-100'
+                    }`}>
                       {inCart.quantity}x
                     </span>
                   )}
-                  <h3 className="font-extrabold text-white text-sm line-clamp-2">{p.name}</h3>
-                  <div className="mt-2 text-lg font-black text-orange-500">{formatMoney(p.price)}</div>
+                  <h3 className="font-extrabold text-white text-sm line-clamp-2 pr-6 leading-tight">{p.name}</h3>
+                  <div className={`mt-1 text-base font-black leading-none ${catColor.text}`}>{formatMoney(p.price)}</div>
                 </button>
               );
             })}
@@ -250,10 +310,14 @@ export const POSView: React.FC<POSViewProps> = ({ business, categories, products
       </div>
 
       {/* CART SUMMARY */}
-      <div className="w-full lg:w-96 bg-neutral-900 border-l border-neutral-800 flex flex-col shrink-0 h-64 lg:h-auto">
-        <div className="p-4 bg-neutral-950 border-b border-neutral-800 flex items-center justify-between">
+      <div className={`w-full lg:w-96 bg-neutral-900 border-l border-neutral-800 flex flex-col shrink-0 h-1/3 lg:h-[calc(100vh-2rem)] lg:sticky lg:top-4 transition-all duration-300 ${
+        cartBounce ? 'ring-2 ring-orange-500 scale-[1.01] shadow-xl shadow-orange-950/30' : ''
+      }`}>
+        <div className={`p-4 bg-neutral-950 border-b border-neutral-800 flex items-center justify-between transition-all duration-300 ${
+          cartBounce ? 'bg-orange-950/20' : ''
+        }`}>
           <h2 className="font-extrabold text-white flex items-center gap-2">
-            <ShoppingBag className="w-5 h-5 text-orange-500" /> Pedido Atual
+            <ShoppingBag className={`w-5 h-5 text-orange-500 transition-transform duration-300 ${cartBounce ? 'scale-135 rotate-12' : ''}`} /> Pedido Atual
           </h2>
           {cart.length > 0 && (
             <button onClick={() => setCart([])} className="text-red-400 text-xs font-bold hover:text-red-300">
@@ -262,25 +326,25 @@ export const POSView: React.FC<POSViewProps> = ({ business, categories, products
           )}
         </div>
         
-        <div className="flex-1 overflow-y-auto p-3 space-y-2">
+        <div className="flex-1 overflow-y-auto p-2 space-y-1.5">
           {cart.length === 0 ? (
             <div className="h-full flex items-center justify-center text-neutral-500 text-sm font-bold">
               Nenhum item adicionado
             </div>
           ) : (
             cart.map(item => (
-              <div key={item.product.id} className="bg-neutral-950 border border-neutral-800 rounded-xl p-3 flex items-center justify-between">
+              <div key={item.product.id} className="bg-neutral-950 border border-neutral-800 rounded-lg p-2 flex items-center justify-between">
                 <div className="flex-1 min-w-0 pr-2">
-                  <div className="font-bold text-sm text-white truncate">{item.product.name}</div>
-                  <div className="text-orange-400 font-bold text-xs mt-0.5">{formatMoney(item.product.price * item.quantity)}</div>
+                  <div className="font-bold text-xs text-white truncate">{item.product.name}</div>
+                  <div className="text-orange-400 font-bold text-[10px] mt-0.5">{formatMoney(item.product.price * item.quantity)}</div>
                 </div>
-                <div className="flex items-center gap-2 shrink-0">
-                  <button onClick={() => handleUpdateQty(item.product.id, -1)} className="w-8 h-8 rounded-lg bg-neutral-800 flex items-center justify-center text-white active:scale-90">
-                    <Minus className="w-4 h-4" />
+                <div className="flex items-center gap-1.5 shrink-0">
+                  <button onClick={() => handleUpdateQty(item.product.id, -1)} className="w-7 h-7 rounded-lg bg-neutral-800 flex items-center justify-center text-white active:scale-90">
+                    <Minus className="w-3 h-3" />
                   </button>
-                  <span className="w-6 text-center font-black text-white">{item.quantity}</span>
-                  <button onClick={() => handleUpdateQty(item.product.id, 1)} className="w-8 h-8 rounded-lg bg-orange-600 flex items-center justify-center text-white active:scale-90">
-                    <Plus className="w-4 h-4" />
+                  <span className="w-5 text-center font-black text-white text-xs">{item.quantity}</span>
+                  <button onClick={() => handleUpdateQty(item.product.id, 1)} className="w-7 h-7 rounded-lg bg-orange-600 flex items-center justify-center text-white active:scale-90">
+                    <Plus className="w-3 h-3" />
                   </button>
                 </div>
               </div>

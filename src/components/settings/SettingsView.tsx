@@ -25,13 +25,15 @@ import {
   CheckCheck,
   Mail,
   Briefcase,
-  User
+  User,
+  Database
 } from 'lucide-react';
-import { Business, Attendant, PrinterConfig, PrintJob, AdminUser } from '../../types';
+import { Business, Attendant, PrinterConfig, PrintJob, AdminUser, Category } from '../../types';
 import { supabaseService } from '../../services/supabaseService';
 import { SQL_SCHEMA_SCRIPT, MASTER_ADMIN_CREDENTIALS } from '../../data/initialData';
 import { playBeep } from '../../lib/sound';
 import { TicketPrintModal } from '../pos/TicketPrintModal';
+import { getDB } from '../../lib/offlineDb';
 
 interface SettingsViewProps {
   business: Business | null;
@@ -39,7 +41,7 @@ interface SettingsViewProps {
 }
 
 export const SettingsView: React.FC<SettingsViewProps> = ({ business, onBusinessUpdate }) => {
-  const [activeTab, setActiveTab] = useState<'printer' | 'attendants' | 'admin' | 'business'>('printer');
+  const [activeTab, setActiveTab] = useState<'printer' | 'attendants' | 'admin' | 'business' | 'maintenance'>('printer');
   
   // Admin state
   const [adminUser, setAdminUser] = useState<AdminUser | null>(supabaseService.getCurrentAdmin());
@@ -56,9 +58,34 @@ export const SettingsView: React.FC<SettingsViewProps> = ({ business, onBusiness
 
   // Printer config state
   const [printerConfig, setPrinterConfig] = useState<PrinterConfig>(supabaseService.getPrinterConfig());
+  const [categories] = useState<Category[]>(supabaseService.getLocalCategories());
+  const [usbDevices, setUsbDevices] = useState<USBDevice[]>([]);
   const [saveSuccess, setSaveSuccess] = useState(false);
   const [testOrderModalOpen, setTestOrderModalOpen] = useState(false);
   const [testSuccessMessage, setTestSuccessMessage] = useState<string | null>(null);
+
+  const requestUsbPrinter = async () => {
+    try {
+      const device = await (navigator as any).usb.requestDevice({ filters: [] });
+      setUsbDevices(prev => [...prev, device]);
+    } catch (err) {
+      console.error('Erro ao solicitar dispositivo:', err);
+    }
+  };
+
+  const updateCategoryMapping = (categoryId: string, device: USBDevice) => {
+    setPrinterConfig(prev => ({
+      ...prev,
+      categoryMappings: {
+        ...(prev.categoryMappings || {}),
+        [categoryId]: {
+          vendorId: device.vendorId,
+          productId: device.productId,
+          deviceName: device.productName || 'Impressora Desconhecida'
+        }
+      }
+    }));
+  };
   
   // Spooler print jobs state
   const [printJobs, setPrintJobs] = useState<PrintJob[]>([]);
@@ -132,6 +159,19 @@ export const SettingsView: React.FC<SettingsViewProps> = ({ business, onBusiness
       window.removeEventListener('printfood:admin-auth-changed', handleAdminAuthEvent);
     };
   }, [business]);
+
+  // Carregar dispositivos USB ja pareados no inicio
+  useEffect(() => {
+    if (navigator.usb) {
+      navigator.usb.getDevices()
+        .then(devices => {
+          setUsbDevices(devices);
+        })
+        .catch(err => {
+          console.error('Erro ao listar dispositivos USB pareados:', err);
+        });
+    }
+  }, []);
 
   // Save printer config
   const handleSavePrinterConfig = () => {
@@ -245,6 +285,43 @@ export const SettingsView: React.FC<SettingsViewProps> = ({ business, onBusiness
     setTimeout(() => setCopiedSql(false), 2000);
   };
 
+  const handleExportData = async () => {
+    const localStorageKeys = [
+      'printfood_local_orders', 'printfood_local_business', 'printfood_local_attendants',
+      'printfood_active_attendant', 'printfood_printer_config', 'printfood_local_print_jobs',
+      'printfood_local_products', 'printfood_local_categories', 'printfood_admin_auth', 'printfood_local_cart'
+    ];
+    const exportData: any = {};
+    localStorageKeys.forEach(key => {
+      const val = localStorage.getItem(key);
+      exportData[key] = val ? JSON.parse(val) : null;
+    });
+    const db = await getDB();
+    exportData['indexedDB_orders'] = await db.getAll('orders');
+    exportData['indexedDB_printJobs'] = await db.getAll('printJobs');
+
+    const blob = new Blob([JSON.stringify(exportData, null, 2)], { type: 'application/json' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `printfood_backup_${new Date().toISOString()}.json`;
+    a.click();
+  };
+
+  const handleClearData = async () => {
+    if (!confirm('Tem certeza que deseja apagar todos os dados locais? Isso não pode ser desfeito.')) return;
+    const localStorageKeys = [
+      'printfood_local_orders', 'printfood_local_business', 'printfood_local_attendants',
+      'printfood_active_attendant', 'printfood_printer_config', 'printfood_local_print_jobs',
+      'printfood_local_products', 'printfood_local_categories', 'printfood_admin_auth', 'printfood_local_cart'
+    ];
+    localStorageKeys.forEach(key => localStorage.removeItem(key));
+    const db = await getDB();
+    await db.clear('orders');
+    await db.clear('printJobs');
+    window.location.reload();
+  };
+
   return (
     <div className="flex-1 p-4 sm:p-6 overflow-y-auto bg-neutral-950">
       <div className="max-w-6xl mx-auto space-y-6">
@@ -261,7 +338,7 @@ export const SettingsView: React.FC<SettingsViewProps> = ({ business, onBusiness
             </p>
           </div>
 
-          <div className="flex items-center gap-1.5 bg-neutral-900 p-1.5 rounded-2xl border border-neutral-800 self-start">
+          <div className="flex items-center gap-1.5 bg-neutral-900 p-1.5 rounded-2xl border border-neutral-800 self-start flex-wrap">
             <button
               onClick={() => setActiveTab('printer')}
               className={`flex items-center gap-2 px-3.5 py-2 rounded-xl text-xs sm:text-sm font-bold transition ${
@@ -309,6 +386,18 @@ export const SettingsView: React.FC<SettingsViewProps> = ({ business, onBusiness
               <Store className="w-4 h-4" />
               <span>Dados da Loja</span>
             </button>
+
+            <button
+              onClick={() => setActiveTab('maintenance')}
+              className={`flex items-center gap-2 px-3.5 py-2 rounded-xl text-xs sm:text-sm font-bold transition ${
+                activeTab === 'maintenance'
+                  ? 'bg-orange-600 text-white shadow-md'
+                  : 'text-neutral-400 hover:text-white hover:bg-neutral-800'
+              }`}
+            >
+              <Database className="w-4 h-4" />
+              <span>Manutenção</span>
+            </button>
           </div>
         </div>
 
@@ -318,7 +407,38 @@ export const SettingsView: React.FC<SettingsViewProps> = ({ business, onBusiness
         {activeTab === 'printer' && (
           <div className="space-y-6">
             
-            {/* 1. SELEÇÃO DE MODO OPERACIONAL */}
+            {/* 3. MAPEAMENTO DE IMPRESSORAS POR CATEGORIA (WEBUSB) */}
+            <div className="bg-neutral-900 border border-neutral-800 rounded-3xl p-5 sm:p-6 shadow-sm">
+              <h3 className="text-base font-black text-white mb-4">Mapeamento de Impressoras (WebUSB)</h3>
+              
+              <button
+                onClick={requestUsbPrinter}
+                className="mb-4 px-4 py-2 bg-orange-600 text-white rounded-xl text-xs font-bold"
+              >
+                Detectar Nova Impressora USB
+              </button>
+
+              <div className="space-y-3">
+                {categories.map(category => (
+                  <div key={category.id} className="flex items-center justify-between bg-neutral-950 p-3 rounded-xl border border-neutral-800">
+                    <span className="text-sm font-bold text-white">{category.name}</span>
+                    <select
+                      value={printerConfig.categoryMappings?.[category.id]?.productId || ''}
+                      onChange={(e) => {
+                        const device = usbDevices.find(d => d.productId.toString() === e.target.value);
+                        if (device) updateCategoryMapping(category.id, device);
+                      }}
+                      className="bg-neutral-900 text-neutral-300 text-xs p-2 rounded-lg border border-neutral-700"
+                    >
+                      <option value="">Impressora Padrão</option>
+                      {usbDevices.map(d => (
+                        <option key={d.productId} value={d.productId}>{d.productName || 'USB Printer'}</option>
+                      ))}
+                    </select>
+                  </div>
+                ))}
+              </div>
+            </div>
             <div className="bg-neutral-900 border border-neutral-800 rounded-3xl p-5 sm:p-6 shadow-sm">
               <div className="mb-4">
                 <span className="text-xs font-bold text-orange-400 uppercase tracking-wider">
@@ -509,8 +629,86 @@ export const SettingsView: React.FC<SettingsViewProps> = ({ business, onBusiness
                       <option value="browser">Impressora Padrão do Sistema / Navegador (Recomendado)</option>
                       <option value="network">Impressora de Rede / Ethernet (Raw TCP / 9100)</option>
                       <option value="bluetooth">Bluetooth ESC/POS (Portátil)</option>
+                      <option value="escpos_usb">USB (WebUSB Directo)</option>
                     </select>
                   </div>
+
+                  {/* USB / Default Printer Selection Details */}
+                  {printerConfig.printerType === 'escpos_usb' ? (
+                    <div className="bg-neutral-950 p-4 rounded-xl border border-neutral-800 space-y-4">
+                      <div>
+                        <span className="text-[11px] font-bold text-neutral-400 block mb-1.5 uppercase">
+                          Seletor de Impressora Padrão (USB):
+                        </span>
+                        
+                        <div className="flex gap-2 mb-3">
+                          <select
+                            value={printerConfig.usbPrinterVendorId && printerConfig.usbPrinterProductId ? `${printerConfig.usbPrinterVendorId}:${printerConfig.usbPrinterProductId}` : ''}
+                            onChange={(e) => {
+                              if (!e.target.value) {
+                                setPrinterConfig({ ...printerConfig, usbPrinterVendorId: undefined, usbPrinterProductId: undefined });
+                                return;
+                              }
+                              const [vId, pId] = e.target.value.split(':').map(Number);
+                              setPrinterConfig({ ...printerConfig, usbPrinterVendorId: vId, usbPrinterProductId: pId });
+                            }}
+                            className="flex-1 bg-neutral-900 text-neutral-300 text-xs p-2.5 rounded-lg border border-neutral-700 outline-none focus:border-orange-500 font-semibold"
+                          >
+                            <option value="">-- Nenhuma Impressora Selecionada --</option>
+                            {usbDevices.map((d, index) => (
+                              <option key={`${d.vendorId}:${d.productId}:${index}`} value={`${d.vendorId}:${d.productId}`}>
+                                {d.productName || `Dispositivo USB (${d.vendorId}:${d.productId})`}
+                              </option>
+                            ))}
+                          </select>
+                          
+                          <button
+                            type="button"
+                            onClick={async () => {
+                              try {
+                                const device = await navigator.usb.requestDevice({ filters: [] });
+                                setUsbDevices(prev => {
+                                  if (prev.some(d => d.vendorId === device.vendorId && d.productId === device.productId)) {
+                                    return prev;
+                                  }
+                                  return [...prev, device];
+                                });
+                                setPrinterConfig({
+                                  ...printerConfig,
+                                  usbPrinterVendorId: device.vendorId,
+                                  usbPrinterProductId: device.productId
+                                });
+                              } catch (err) {
+                                console.error('Erro ao emparelhar dispositivo USB:', err);
+                              }
+                            }}
+                            className="px-3.5 bg-orange-600 hover:bg-orange-500 text-white rounded-lg text-xs font-black transition whitespace-nowrap"
+                          >
+                            Detectar Nova
+                          </button>
+                        </div>
+                        
+                        <p className="text-[10px] text-neutral-500 leading-normal">
+                          Dispositivos pareados anteriormente via WebUSB no seu navegador são carregados automaticamente aqui. Selecione o dispositivo de preferência para acionar a impressão térmica instantânea.
+                        </p>
+                      </div>
+                    </div>
+                  ) : printerConfig.printerType === 'browser' ? (
+                    <div className="bg-neutral-950 p-4 rounded-xl border border-neutral-800 space-y-2">
+                      <div className="text-[11px] font-bold text-neutral-400 block uppercase">
+                        Configuração de Impressora do Sistema:
+                      </div>
+                      <p className="text-xs text-neutral-400 leading-relaxed">
+                        Por segurança, o navegador não expõe a lista de impressoras físicas instaladas no seu sistema operacional diretamente ao JavaScript. 
+                      </p>
+                      <p className="text-xs text-neutral-400 leading-relaxed">
+                        Para automatizar, o sistema usa o assistente nativo. Você pode definir a sua <strong>impressora preferida como padrão diretamente nas configurações do seu sistema operacional</strong> (Windows/macOS/Linux) para uso automático.
+                      </p>
+                      <div className="bg-orange-950/20 border border-orange-900/50 p-3 rounded-lg text-[11px] text-orange-300 leading-normal">
+                        <strong>Dica de Automatização:</strong> Ative a opção <strong>"Impressão Direta Automática"</strong> abaixo e configure o atalho do Chrome com o comando <code className="bg-neutral-950 text-white px-1 py-0.5 rounded">--kiosk-printing</code> para imprimir sem a janela de diálogo aparecer!
+                      </div>
+                    </div>
+                  ) : null}
 
                   {/* Rede IP se selecionado */}
                   {printerConfig.printerType === 'network' && (
@@ -540,6 +738,36 @@ export const SettingsView: React.FC<SettingsViewProps> = ({ business, onBusiness
 
                   {/* Vias separadas por item */}
                   <div className="pt-2 border-t border-neutral-800/80 space-y-2.5">
+                    <label className="flex items-center gap-3 cursor-pointer select-none">
+                      <input
+                        type="checkbox"
+                        checked={printerConfig.directPrinting}
+                        onChange={e => setPrinterConfig({ ...printerConfig, directPrinting: e.target.checked })}
+                        className="w-4 h-4 accent-orange-500 rounded"
+                      />
+                      <div className="text-xs">
+                        <span className="font-bold text-white block">Impressão Direta Automática (Modo Kiosk)</span>
+                        <span className="text-neutral-400">
+                          Se ativado, pula a janela de diálogo (requer navegador com --kiosk-printing).
+                        </span>
+                      </div>
+                    </label>
+
+                    <label className="flex items-center gap-3 cursor-pointer select-none">
+                      <input
+                        type="checkbox"
+                        checked={printerConfig.useCompactTemplate}
+                        onChange={e => setPrinterConfig({ ...printerConfig, useCompactTemplate: e.target.checked })}
+                        className="w-4 h-4 accent-orange-500 rounded"
+                      />
+                      <div className="text-xs">
+                        <span className="font-bold text-white block">Template de Ficha Compacta</span>
+                        <span className="text-neutral-400">
+                          Remove cabeçalhos extensos e reduz o espaçamento para economizar papel.
+                        </span>
+                      </div>
+                    </label>
+
                     <label className="flex items-center gap-3 cursor-pointer select-none">
                       <input
                         type="checkbox"
@@ -1282,6 +1510,38 @@ export const SettingsView: React.FC<SettingsViewProps> = ({ business, onBusiness
               </pre>
             </div>
 
+          </div>
+        )}
+
+        {/* ==================================================== */}
+        {/* TAB 5: MANUTENÇÃO */}
+        {/* ==================================================== */}
+        {activeTab === 'maintenance' && (
+          <div className="space-y-6">
+            <div className="bg-neutral-900 border border-neutral-800 rounded-3xl p-5 sm:p-6 shadow-sm">
+              <h3 className="text-base font-black text-white flex items-center gap-2 mb-4">
+                <Database className="w-5 h-5 text-orange-500" />
+                <span>Manutenção do Sistema</span>
+              </h3>
+              
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                <button
+                  onClick={handleExportData}
+                  className="p-4 bg-neutral-950 border border-neutral-800 hover:border-orange-500 rounded-2xl text-left transition"
+                >
+                  <div className="font-bold text-white mb-1">Exportar Backup (JSON)</div>
+                  <div className="text-xs text-neutral-400">Baixe um arquivo JSON com todos os dados locais para backup.</div>
+                </button>
+                
+                <button
+                  onClick={handleClearData}
+                  className="p-4 bg-neutral-950 border border-neutral-800 hover:border-red-500 rounded-2xl text-left transition"
+                >
+                  <div className="font-bold text-red-400 mb-1">Limpar Dados do App</div>
+                  <div className="text-xs text-neutral-400">Reseta o estado do dispositivo (troca de turno/limpeza).</div>
+                </button>
+              </div>
+            </div>
           </div>
         )}
 

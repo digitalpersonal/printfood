@@ -1,25 +1,31 @@
 import React, { useEffect, useState } from 'react';
 import { supabaseService } from '../../services/supabaseService';
-import { Business, Order } from '../../types';
-import { DollarSign, ShoppingBag, TrendingUp, UtensilsCrossed, ArrowRight, Printer, Filter } from 'lucide-react';
+import { Business, Order, PrintJob } from '../../types';
+import { DollarSign, ShoppingBag, TrendingUp, UtensilsCrossed, ArrowRight, Printer, Filter, RefreshCw, Trash2 } from 'lucide-react';
+import { OrderHistory } from './OrderHistory';
 
 interface AdminViewProps {
   business: Business | null;
   onNavigateToProducts?: () => void;
 }
 
-type PeriodType = 'dia' | 'semana' | 'mes' | 'turno_manha' | 'turno_tarde' | 'turno_noite';
+type PeriodType = 'dia' | 'semana' | 'mes' | 'turno_manha' | 'turno_tarde' | 'turno_noite' | 'print_queue';
 
 export const AdminView: React.FC<AdminViewProps> = ({ business, onNavigateToProducts }) => {
   const [orders, setOrders] = useState<Order[]>([]);
   const [loading, setLoading] = useState(true);
   const [period, setPeriod] = useState<PeriodType>('dia');
   const [printSuccessMsg, setPrintSuccessMsg] = useState<string | null>(null);
+  const [printJobs, setPrintJobs] = useState<PrintJob[]>([]);
 
   const fetchOrders = () => {
     if (!business) return;
-    supabaseService.getAllOrders(business.id).then(data => {
-      setOrders(data);
+    Promise.all([
+      supabaseService.getAllOrders(business.id),
+      supabaseService.getPrintJobs(business.id)
+    ]).then(([ordersData, jobsData]) => {
+      setOrders(ordersData);
+      setPrintJobs(jobsData);
       setLoading(false);
     });
   };
@@ -193,6 +199,12 @@ export const AdminView: React.FC<AdminViewProps> = ({ business, onNavigateToProd
           >
             Mês
           </button>
+          <button
+            onClick={() => setPeriod('print_queue')}
+            className={`px-3 py-1.5 rounded-xl text-xs font-black transition ${period === 'print_queue' ? 'bg-red-600 text-white shadow' : 'text-neutral-400 hover:text-white'}`}
+          >
+            Fila de Impressão
+          </button>
         </div>
 
         <div className="text-sm font-bold text-orange-400 uppercase tracking-wider">
@@ -244,49 +256,64 @@ export const AdminView: React.FC<AdminViewProps> = ({ business, onNavigateToProd
           </div>
         </div>
 
-        {/* ORDERS LIST */}
+        {/* ORDERS LIST OR PRINT QUEUE */}
         <div className="bg-neutral-900 border border-neutral-800 rounded-3xl p-6 shadow-sm">
-          <h3 className="text-lg font-black text-white mb-4">Fichas Registradas ({filteredOrders.length})</h3>
-          <div className="overflow-x-auto">
-            <table className="w-full text-left text-sm">
-              <thead className="text-neutral-500 uppercase font-bold text-xs">
-                <tr>
-                  <th className="pb-3 border-b border-neutral-800">Ficha</th>
-                  <th className="pb-3 border-b border-neutral-800">Horário</th>
-                  <th className="pb-3 border-b border-neutral-800">Status</th>
-                  <th className="pb-3 border-b border-neutral-800">Pagamento</th>
-                  <th className="pb-3 border-b border-neutral-800">Cliente</th>
-                  <th className="pb-3 border-b border-neutral-800 text-right">Valor</th>
-                </tr>
-              </thead>
-              <tbody className="text-neutral-300">
-                {filteredOrders.length === 0 ? (
-                  <tr>
-                    <td colSpan={6} className="py-8 text-center text-neutral-500 text-xs">Nenhum pedido encontrado para este filtro.</td>
-                  </tr>
-                ) : (
-                  filteredOrders.map(o => (
-                    <tr key={o.id} className="border-b border-neutral-800/50">
-                      <td className="py-3 font-bold text-white">#{o.ticket_number}</td>
-                      <td className="py-3 text-xs text-neutral-400">{new Date(o.created_at || Date.now()).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })}</td>
-                      <td className="py-3">
-                        <span className={`px-2 py-1 rounded-full text-xs font-bold ${
-                          o.order_status === 'cancelado' ? 'bg-red-950 text-red-500' :
-                          o.order_status === 'entregue' ? 'bg-neutral-800 text-neutral-500' :
-                          'bg-emerald-950 text-emerald-500'
-                        }`}>
-                          {o.order_status.toUpperCase()}
-                        </span>
-                      </td>
-                      <td className="py-3 font-bold uppercase text-xs">{o.payment_method}</td>
-                      <td className="py-3">{o.customer_name || '-'}</td>
-                      <td className="py-3 text-right font-black">{formatMoney(o.total)}</td>
+          {period === 'print_queue' ? (
+            <>
+              <div className="flex items-center justify-between mb-4">
+                <h3 className="text-lg font-black text-white">Fila de Impressão Remota ({printJobs.length})</h3>
+                <button 
+                  onClick={() => supabaseService.clearPrintJobs(business!.id).then(fetchOrders)}
+                  className="px-3 py-1.5 bg-red-950/50 hover:bg-red-900 text-red-400 rounded-xl text-[11px] font-black flex items-center gap-1.5 transition"
+                >
+                  <Trash2 className="w-3.5 h-3.5" />
+                  Limpar Tudo
+                </button>
+              </div>
+              <div className="overflow-x-auto">
+                <table className="w-full text-left text-sm">
+                  <thead className="text-neutral-500 uppercase font-bold text-xs">
+                    <tr>
+                      <th className="pb-3 border-b border-neutral-800">Ficha</th>
+                      <th className="pb-3 border-b border-neutral-800">Origem</th>
+                      <th className="pb-3 border-b border-neutral-800">Status</th>
+                      <th className="pb-3 border-b border-neutral-800">Data</th>
+                      <th className="pb-3 border-b border-neutral-800 text-right">Ação</th>
                     </tr>
-                  ))
-                )}
-              </tbody>
-            </table>
-          </div>
+                  </thead>
+                  <tbody className="text-neutral-300">
+                    {printJobs.map(job => (
+                      <tr key={job.id} className="border-b border-neutral-800/50">
+                        <td className="py-3 font-bold text-white">#{job.ticket_number}</td>
+                        <td className="py-3 text-xs">{job.source_device}</td>
+                        <td className="py-3">
+                          <span className={`px-2 py-1 rounded-full text-xs font-bold ${
+                            job.status === 'pending' ? 'bg-amber-950 text-amber-500' :
+                            job.status === 'printed' ? 'bg-emerald-950 text-emerald-500' :
+                            'bg-red-950 text-red-500'
+                          }`}>
+                            {job.status.toUpperCase()}
+                          </span>
+                        </td>
+                        <td className="py-3 text-xs">{new Date(job.created_at).toLocaleTimeString('pt-BR')}</td>
+                        <td className="py-3 text-right">
+                          <button 
+                            onClick={() => supabaseService.updatePrintJobStatus(job.id, 'pending').then(fetchOrders)}
+                            className="p-2 hover:bg-neutral-800 rounded-lg text-blue-400 transition"
+                            title="Reenviar"
+                          >
+                            <RefreshCw className="w-4 h-4" />
+                          </button>
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            </>
+          ) : (
+            <OrderHistory orders={orders} formatMoney={formatMoney} />
+          )}
         </div>
 
       </div>

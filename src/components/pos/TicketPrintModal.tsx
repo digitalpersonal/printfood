@@ -2,6 +2,7 @@ import React, { useEffect } from 'react';
 import { Printer, X, ArrowRight, Send } from 'lucide-react';
 import { Order, Business, PrinterConfig } from '../../types';
 import { supabaseService } from '../../services/supabaseService';
+import { connectWebUsbPrinter, printViaWebUsb } from '../../lib/webUsbPrinter';
 
 interface TicketPrintModalProps {
   isOpen: boolean;
@@ -19,6 +20,7 @@ export const TicketPrintModal: React.FC<TicketPrintModalProps> = ({
   business
 }) => {
   const [printSuccessMsg, setPrintSuccessMsg] = React.useState<string | null>(null);
+  const [showConfirmClose, setShowConfirmClose] = React.useState(false);
 
   const config: PrinterConfig = supabaseService.getPrinterConfig();
   const isMobileSendToPc = config.targetMode === 'mobile_send_to_pc';
@@ -26,19 +28,14 @@ export const TicketPrintModal: React.FC<TicketPrintModalProps> = ({
   const is58mm = config.paperWidth === '58mm';
   const isA4 = config.paperWidth === 'a4';
 
-  // Auto-print if enabled and not remote-only
   useEffect(() => {
-    if (config.autoPrintOnOrder && !isMobileSendToPc && order) {
-      const timer = setTimeout(() => {
-        window.print();
-      }, 400);
-      return () => clearTimeout(timer);
+    if (isOpen) {
+      setShowConfirmClose(false);
     }
-  }, [order?.id, config.autoPrintOnOrder, isMobileSendToPc]);
+  }, [isOpen, order?.id]);
 
-  if (!isOpen || !order) return null;
-
-  const handlePrint = () => {
+  const handlePrint = async () => {
+    if (!order) return;
     if (isMobileSendToPc) {
       // Simula envio para fila do PC
       supabaseService.dispatchRemotePrintJob({
@@ -53,12 +50,42 @@ export const TicketPrintModal: React.FC<TicketPrintModalProps> = ({
         payment_method: order.payment_method
       });
       setPrintSuccessMsg('Ficha enviada com sucesso para a fila de impressão do Computador!');
+    } else if (config.printerType === 'escpos_usb' && config.usbPrinterVendorId) {
+      try {
+        setPrintSuccessMsg('Enviando via USB...');
+        const device = await connectWebUsbPrinter(config.usbPrinterVendorId, config.usbPrinterProductId);
+        // FIXME: Here you would generate actual ESC/POS bytes based on the ticket content.
+        // For now, we simulate success for the purpose of the requested interface.
+        const mockData = new TextEncoder().encode(`Ficha #${order.ticket_number}\nTotal: ${order.total}\n`);
+        await printViaWebUsb(device, mockData);
+        setPrintSuccessMsg('Ficha impressa via USB!');
+      } catch (err: any) {
+        console.error('Erro na impressora USB:', err);
+        const errMsg = err?.message || '';
+        if (errMsg.includes('permissions policy') || errMsg.includes('disallowed')) {
+          setPrintSuccessMsg('Erro de Permissão: Abra o sistema por uma Nova Aba fora do AI Studio para usar a impressora USB!');
+        } else {
+          setPrintSuccessMsg(`Erro USB: ${err?.message || 'Verifique a conexão da impressora.'}`);
+        }
+      }
     } else {
-      setPrintSuccessMsg('Janela de impressão aberta!');
+      setPrintSuccessMsg(config.directPrinting ? 'Enviando para impressora...' : 'Janela de impressão aberta!');
       window.print();
     }
     setTimeout(() => setPrintSuccessMsg(null), 4000);
   };
+
+  // Auto-print if enabled and not remote-only
+  useEffect(() => {
+    if (config.autoPrintOnOrder && !isMobileSendToPc && order) {
+      const timer = setTimeout(() => {
+        handlePrint();
+      }, 400);
+      return () => clearTimeout(timer);
+    }
+  }, [order?.id, config.autoPrintOnOrder, isMobileSendToPc]);
+
+  if (!isOpen || !order) return null;
 
   const formatMoney = (val: number) => `R$ ${val.toFixed(2).replace('.', ',')}`;
   const orderTime = new Date(order.created_at || Date.now()).toLocaleTimeString('pt-BR', {
@@ -68,79 +95,75 @@ export const TicketPrintModal: React.FC<TicketPrintModalProps> = ({
   const orderDate = new Date(order.created_at || Date.now()).toLocaleDateString('pt-BR');
 
   // Single ticket render
-  const renderSingleVoucher = (copyLabel?: string, specificItem?: { name: string; quantity: number; total: number }) => (
+  const renderSingleVoucher = (uniqueKey: string, copyLabel?: string, specificItem?: { name: string; quantity: number; total: number }) => (
     <div 
-      key={copyLabel || specificItem?.name}
-      className={`bg-white text-neutral-900 rounded-xl p-4 sm:p-5 shadow-lg font-mono text-xs border border-neutral-300 mb-4 ${
+      key={uniqueKey}
+      className={`bg-white text-black rounded-xl ${config.useCompactTemplate ? 'p-2' : 'p-4 sm:p-5'} shadow-lg font-mono text-xs border border-black mb-4 ${
         is58mm ? 'w-full max-w-[240px]' : isA4 ? 'w-full max-w-[500px]' : 'w-full max-w-[320px]'
       }`}
     >
       {/* LOGOMARCA & CABEÇALHO */}
-      <div className="text-center border-b border-dashed border-neutral-400 pb-2.5 mb-2.5">
-        <div className="flex items-center justify-center gap-1 text-xl font-black tracking-tight text-neutral-950 font-['Plus_Jakarta_Sans',sans-serif]">
-          <span>Print</span>
-          <span className="text-orange-600">Food</span>
-        </div>
-        
-        {config.headerCustomText && (
-          <div className="text-[10px] font-bold text-neutral-700 uppercase mt-0.5 tracking-wider">
-            {config.headerCustomText}
+      {!config.useCompactTemplate && (
+        <div className="text-center border-b border-dashed border-black pb-2.5 mb-2.5">
+          <div className="flex items-center justify-center gap-1 text-xl font-black tracking-tight text-black font-['Plus_Jakarta_Sans',sans-serif]">
+            <span>Print</span>
+            <span className="text-black">Food</span>
           </div>
-        )}
+          
+          {config.headerCustomText && (
+            <div className="text-[10px] font-black text-black uppercase mt-0.5 tracking-wider">
+              {config.headerCustomText}
+            </div>
+          )}
 
-        <div className="text-[11px] font-bold text-neutral-600 uppercase">
-          {business?.name || 'Caixa Central'}
-        </div>
-        <div className="text-[10px] text-neutral-500">
-          {orderDate} às {orderTime}
-        </div>
-        {order.attendant_name && (
-          <div className="text-[10px] font-semibold text-neutral-600">
-            Atendente: {order.attendant_name}
+          <div className="text-[11px] font-black text-black uppercase">
+            {business?.name || 'Caixa Central'}
           </div>
-        )}
-        {copyLabel && (
-          <div className="mt-1 inline-block px-2 py-0.5 bg-neutral-200 text-neutral-800 rounded text-[9px] font-black uppercase">
-            {copyLabel}
+          <div className="text-[10px] text-black">
+            {orderDate} às {orderTime}
           </div>
-        )}
-      </div>
+          {order.attendant_name && (
+            <div className="text-[10px] font-black text-black">
+              Atendente: {order.attendant_name}
+            </div>
+          )}
+          {copyLabel && (
+            <div className="mt-1 inline-block px-2 py-0.5 bg-neutral-200 text-neutral-800 rounded text-[9px] font-black uppercase">
+              {copyLabel}
+            </div>
+          )}
+        </div>
+      )}
 
       {/* DESTAQUE NÚMERO DA FICHA */}
-      <div className="text-center py-2 bg-neutral-100 rounded-lg border border-neutral-300 mb-3">
-        <div className="text-[10px] font-bold tracking-widest text-neutral-600 uppercase">
-          {specificItem ? 'VALE RETIRADA - ITEM' : 'FICHA DE RETIRADA'}
+      <div className={`text-center ${config.useCompactTemplate ? 'py-1' : 'py-2'} bg-black rounded-lg border border-black mb-3`}>
+        <div className="text-[10px] font-black tracking-widest text-white uppercase">
+          {specificItem ? 'VALE RETIRADA - ITEM' : 'FICHA'} #{order.ticket_number}
         </div>
-        <div className="text-4xl font-black text-neutral-950 tracking-wider">
-          #{order.ticket_number}
-        </div>
-        {order.customer_name && (
-          <div className="text-xs font-bold text-neutral-700 mt-1">
-            Cliente: {order.customer_name}
-          </div>
-        )}
       </div>
 
       {/* CONTEÚDO: SEPARADO POR ITEM OU LISTA COMPLETA */}
       {specificItem ? (
-        <div className="border-b border-dashed border-neutral-400 pb-2.5 mb-2.5 text-center">
-          <div className="text-base font-black text-neutral-950">
+        <div className="border-b border-dashed border-black pb-2.5 mb-2.5 text-center">
+          <div className={`text-lg font-black text-black ${config.useCompactTemplate ? 'font-mono' : ''}`}>
             {specificItem.quantity}x {specificItem.name}
           </div>
-          <div className="text-[11px] font-bold text-neutral-600 mt-0.5">
+          <div className="text-[11px] font-black text-black mt-0.5">
             Valor: {formatMoney(specificItem.total)}
           </div>
         </div>
       ) : (
-        <div className="border-b border-dashed border-neutral-400 pb-2.5 mb-2.5 space-y-1.5">
-          <div className="text-[10px] font-bold text-neutral-500 uppercase flex justify-between">
-            <span>ITEM</span>
-            <span>TOTAL</span>
-          </div>
+        <div className={`border-b border-dashed border-black ${config.useCompactTemplate ? 'pb-1 mb-1' : 'pb-2.5 mb-2.5'} space-y-1`}>
+          {!config.useCompactTemplate && (
+            <div className="text-[10px] font-black text-black uppercase flex justify-between">
+              <span>ITEM</span>
+              <span>TOTAL</span>
+            </div>
+          )}
           {items.map((item, idx) => (
-            <div key={idx} className="flex justify-between items-start text-xs font-semibold">
+            <div key={idx} className={`flex justify-between items-start text-sm font-black ${config.useCompactTemplate ? 'font-mono' : ''}`}>
               <span className="pr-2">
-                <span className="font-bold">{item.quantity}x</span> {item.name}
+                <span className="font-black">{item.quantity}x</span> {item.name}
               </span>
               <span className="shrink-0">{formatMoney(item.total)}</span>
             </div>
@@ -149,35 +172,77 @@ export const TicketPrintModal: React.FC<TicketPrintModalProps> = ({
       )}
 
       {/* TOTAL & FORMA DE PAGAMENTO */}
-      <div className="border-b border-dashed border-neutral-400 pb-2 mb-2 space-y-0.5">
-        <div className="flex justify-between items-center text-xs font-black">
-          <span>TOTAL PAGO:</span>
+      <div className="border-b border-dashed border-black pb-2 mb-2 space-y-0.5">
+        <div className="flex justify-between items-center text-xs font-black text-black">
+          <span>TOTAL:</span>
           <span className="text-sm">{formatMoney(order.total)}</span>
-        </div>
-        <div className="flex justify-between items-center text-[10px] text-neutral-600 font-semibold uppercase">
-          <span>FORMA:</span>
-          <span>{order.payment_method.toUpperCase()}</span>
         </div>
       </div>
 
       {/* MENSAGEM DO RODAPÉ */}
-      <div className="text-center pt-1 text-[10px] font-bold text-neutral-600 uppercase">
-        {config.footerCustomText || '*** APRESENTE ESTA FICHA NO BALCÃO ***'}
+      <div className="text-center pt-1 text-[10px] font-black text-black uppercase">
+        {config.footerCustomText || '*** APRESENTE ESTA FICHA ***'}
       </div>
     </div>
   );
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/85 p-4 backdrop-blur-sm">
-      <div className="w-full max-w-md bg-neutral-900 border border-neutral-800 rounded-3xl overflow-hidden shadow-2xl flex flex-col max-h-[90vh]">
+      <div className="w-full max-w-md bg-neutral-900 border border-neutral-800 rounded-3xl overflow-hidden shadow-2xl flex flex-col max-h-[90vh] relative">
         
+        {/* CONFIRM CLOSE OVERLAY */}
+        {showConfirmClose && (
+          <div className="absolute inset-0 z-50 bg-neutral-950/98 flex flex-col items-center justify-center p-6 text-center animate-in fade-in zoom-in-95 duration-200">
+            <div className="w-16 h-16 bg-orange-600/10 border border-orange-500/30 text-orange-500 rounded-full flex items-center justify-center mb-4 animate-bounce">
+              <Printer className="w-8 h-8" />
+            </div>
+            
+            <h3 className="text-xl font-black text-white mb-2">
+              Pedido impresso corretamente?
+            </h3>
+            
+            <p className="text-sm text-neutral-400 mb-6 max-w-xs leading-relaxed">
+              Verifique se a ficha saiu da impressora térmica. Se prosseguir sem imprimir, as informações do pedido ativo serão fechadas da tela.
+            </p>
+            
+            <div className="flex flex-col w-full gap-3">
+              <button
+                onClick={() => {
+                  setShowConfirmClose(false);
+                  onClose();
+                }}
+                className="w-full py-4 bg-emerald-600 hover:bg-emerald-500 text-white rounded-2xl font-black text-base flex items-center justify-center gap-2 transition active:scale-98 shadow-lg shadow-emerald-950/50"
+              >
+                Sim, iniciar Nova Venda
+              </button>
+              
+              <button
+                onClick={async () => {
+                  setShowConfirmClose(false);
+                  await handlePrint();
+                }}
+                className="w-full py-4 bg-neutral-800 hover:bg-neutral-700 text-white rounded-2xl font-bold text-sm flex items-center justify-center gap-2 transition"
+              >
+                Não, Re-imprimir Ficha
+              </button>
+
+              <button
+                onClick={() => setShowConfirmClose(false)}
+                className="w-full py-2.5 text-neutral-500 hover:text-neutral-300 font-bold text-xs transition"
+              >
+                Voltar ao Ticket
+              </button>
+            </div>
+          </div>
+        )}
+
         {/* HEADER */}
         <div className="px-5 py-4 bg-neutral-950 border-b border-neutral-800 flex items-center justify-between">
           <div className="flex items-center gap-2">
             <span className="w-2.5 h-2.5 rounded-full bg-emerald-500 animate-ping" />
             <h2 className="text-base font-black text-white">Venda Confirmada #{order.ticket_number}</h2>
           </div>
-          <button onClick={onClose} className="p-2 rounded-xl hover:bg-neutral-800 text-neutral-400">
+          <button onClick={() => setShowConfirmClose(true)} className="p-2 rounded-xl hover:bg-neutral-800 text-neutral-400">
             <X className="w-5 h-5" />
           </button>
         </div>
@@ -200,14 +265,14 @@ export const TicketPrintModal: React.FC<TicketPrintModalProps> = ({
               items.map((item, idx) => (
                 <React.Fragment key={idx}>
                   {Array.from({ length: copies }).map((_, cIdx) => 
-                    renderSingleVoucher(copies > 1 ? `${cIdx + 1}ª VIA` : undefined, item)
+                    renderSingleVoucher(`item-${idx}-copy-${cIdx}`, copies > 1 ? `${cIdx + 1}ª VIA` : undefined, item)
                   )}
                 </React.Fragment>
               ))
             ) : (
               // Ficha resumida padrão
               Array.from({ length: copies }).map((_, cIdx) => 
-                renderSingleVoucher(copies > 1 ? (cIdx === 0 ? '1ª VIA - CLIENTE' : '2ª VIA - PRODUÇÃO') : undefined)
+                renderSingleVoucher(`resumo-copy-${cIdx}`, copies > 1 ? (cIdx === 0 ? '1ª VIA - CLIENTE' : '2ª VIA - PRODUÇÃO') : undefined)
               )
             )}
           </div>
@@ -231,10 +296,10 @@ export const TicketPrintModal: React.FC<TicketPrintModalProps> = ({
             </button>
             
             <button
-              onClick={onClose}
-              className="py-3.5 px-5 bg-neutral-800 hover:bg-neutral-700 text-neutral-200 rounded-2xl font-bold text-sm flex items-center justify-center gap-2 transition"
+              onClick={() => setShowConfirmClose(true)}
+              className="py-3.5 px-5 bg-orange-950/50 hover:bg-orange-900 text-orange-200 rounded-2xl font-bold text-sm flex items-center justify-center gap-2 transition border border-orange-800/50"
             >
-              <span>Próxima Venda</span>
+              <span>Nova Venda</span>
               <ArrowRight className="w-4 h-4" />
             </button>
           </div>

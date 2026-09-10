@@ -40,7 +40,7 @@ export const Navbar: React.FC<NavbarProps> = ({
   const isAuthorizedAdmin = currentUser?.role === 'admin_geral' || currentUser?.role === 'caixa' || !!adminUser;
 
   return (
-    <header className="bg-neutral-900 border-b border-neutral-800 sticky top-0 z-40 select-none shadow-md">
+    <header className="bg-neutral-900 border-b border-neutral-800 select-none shadow-md">
       {/* STATUS BAR */}
       <div className="max-w-7xl mx-auto px-4 py-1.5 flex items-center justify-between text-xs border-b border-neutral-800/60 text-neutral-400">
         <div className="flex items-center gap-2 font-semibold text-neutral-200">

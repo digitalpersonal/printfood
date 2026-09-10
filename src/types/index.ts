@@ -82,6 +82,11 @@ export interface PrinterConfig {
   networkPrinterPort?: number;
   headerCustomText?: string;
   footerCustomText?: string;
+  directPrinting: boolean;
+  useCompactTemplate?: boolean;
+  usbPrinterVendorId?: number;
+  usbPrinterProductId?: number;
+  categoryMappings?: Record<string, { vendorId: number; productId: number; deviceName: string }>;
 }
 
 export interface PrintJob {

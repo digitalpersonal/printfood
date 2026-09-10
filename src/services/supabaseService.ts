@@ -1,6 +1,7 @@
 import { supabase, isSupabaseConfigured } from '../lib/supabase';
 import { Business, Category, Product, Order, OrderItem, Attendant, PrinterConfig, PrintJob, AdminUser, SystemUser } from '../types';
 import { DEFAULT_BUSINESS, DEFAULT_CATEGORIES, DEFAULT_PRODUCTS, DEFAULT_ATTENDANTS, DEFAULT_PRINTER_CONFIG, DEFAULT_ADMIN, MASTER_ADMIN_CREDENTIALS } from '../data/initialData';
+import { saveOrderOffline, savePrintJobOffline, getOrdersOffline, getPrintJobsOffline } from '../lib/offlineDb';
 
 const LOCAL_ORDERS_KEY = 'printfood_local_orders';
 const LOCAL_BUSINESS_KEY = 'printfood_local_business';
@@ -374,8 +375,7 @@ export const supabaseService = {
 
   async getTodayOrders(businessId: string): Promise<Order[]> {
     if (this.isDemoMode || !isSupabaseConfigured()) {
-      const saved = localStorage.getItem(LOCAL_ORDERS_KEY);
-      return saved ? JSON.parse(saved) : [];
+      return await getOrdersOffline();
     }
 
     try {
@@ -388,10 +388,15 @@ export const supabaseService = {
         .eq('business_id', businessId)
         .gte('created_at', today.toISOString())
         .order('created_at', { ascending: false });
+      
+      if (data) {
+        for (const order of data) {
+          await saveOrderOffline(order);
+        }
+      }
       return data || [];
     } catch {
-      const saved = localStorage.getItem(LOCAL_ORDERS_KEY);
-      return saved ? JSON.parse(saved) : [];
+      return await getOrdersOffline();
     }
   },
 
@@ -419,8 +424,8 @@ export const supabaseService = {
     items: Omit<OrderItem, 'id' | 'order_id'>[]
   ): Promise<Order | null> {
     if (this.isDemoMode || !isSupabaseConfigured()) {
-      const localOrders: Order[] = JSON.parse(localStorage.getItem(LOCAL_ORDERS_KEY) || '[]');
-      const nextNumber = String(localOrders.length + 1).padStart(3, '0');
+      const orders = await getOrdersOffline();
+      const nextNumber = String(orders.length + 1).padStart(3, '0');
       const newOrder: Order = {
         id: 'ord-' + Date.now(),
         business_id: orderData.business_id,
@@ -433,8 +438,7 @@ export const supabaseService = {
         attendant_name: orderData.attendant_name || null,
         created_at: new Date().toISOString()
       };
-      localOrders.unshift(newOrder);
-      localStorage.setItem(LOCAL_ORDERS_KEY, JSON.stringify(localOrders));
+      await saveOrderOffline(newOrder);
       window.dispatchEvent(new CustomEvent('printfood:order-created', { detail: newOrder }));
       return newOrder;
     }
@@ -701,11 +705,10 @@ export const supabaseService = {
         .limit(30);
 
       if (error || !data) {
-        const saved = localStorage.getItem(LOCAL_PRINT_JOBS_KEY);
-        return saved ? JSON.parse(saved) : [];
+        return await getPrintJobsOffline();
       }
 
-      return data.map((d: any) => ({
+      const jobs = data.map((d: any) => ({
         id: d.id,
         business_id: d.business_id,
         order_id: d.order_id,
@@ -719,9 +722,13 @@ export const supabaseService = {
         status: d.status,
         created_at: d.created_at
       }));
+
+      for (const job of jobs) {
+        await savePrintJobOffline(job);
+      }
+      return jobs;
     } catch {
-      const saved = localStorage.getItem(LOCAL_PRINT_JOBS_KEY);
-      return saved ? JSON.parse(saved) : [];
+      return await getPrintJobsOffline();
     }
   },
 
