@@ -77,13 +77,13 @@ export const TicketPrintModal: React.FC<TicketPrintModalProps> = ({
 
   // Auto-print if enabled and not remote-only
   useEffect(() => {
-    if (config.autoPrintOnOrder && !isMobileSendToPc && order) {
+    if (isOpen && config.autoPrintOnOrder && !isMobileSendToPc && order) {
       const timer = setTimeout(() => {
         handlePrint();
       }, 400);
       return () => clearTimeout(timer);
     }
-  }, [order?.id, config.autoPrintOnOrder, isMobileSendToPc]);
+  }, [isOpen, order?.id, config.autoPrintOnOrder, isMobileSendToPc]);
 
   if (!isOpen || !order) return null;
 
@@ -209,113 +209,82 @@ export const TicketPrintModal: React.FC<TicketPrintModalProps> = ({
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/85 p-4 backdrop-blur-sm">
       <style>{`
         @media print {
-          @page {
+          /* Reset absoluto para evitar interferências de outros componentes */
+          * {
+            visibility: hidden !important;
             margin: 0 !important;
             padding: 0 !important;
+            -webkit-print-color-adjust: exact !important;
+            print-color-adjust: exact !important;
+          }
+
+          /* Define o papel e fundo */
+          @page {
+            margin: 0 !important;
+            size: auto;
           }
 
           html, body {
-            margin: 0 !important;
-            padding: 0 !important;
+            visibility: hidden !important;
+            background: white !important;
             width: 100% !important;
             height: auto !important;
-            background: white !important;
-            visibility: hidden !important;
           }
 
-          /* Esconde absolutamente tudo na página */
-          body * {
-            visibility: hidden !important;
-            margin: 0 !important;
-            padding: 0 !important;
-          }
-          
-          /* Garante que o modal e o container da ficha fiquem visíveis e ocupem o topo */
-          .fixed.inset-0 {
-            display: block !important;
-            position: absolute !important;
-            left: 0 !important;
-            top: 0 !important;
-            width: 100% !important;
-            padding: 0 !important;
-            margin: 0 !important;
-            visibility: visible !important;
-            background: white !important;
-          }
-
-          .fixed.inset-0 *,
+          /* Mostra APENAS o container da ficha e seu conteúdo */
           #printfood-printable-ticket,
           #printfood-printable-ticket * {
             visibility: visible !important;
+            color: #000000 !important;
+            font-family: 'Courier New', Courier, monospace !important;
           }
 
+          /* Posiciona o container no topo absoluto da página de impressão */
           #printfood-printable-ticket {
-            width: 100% !important;
-            margin: 0 !important;
-            padding: 0 !important;
             display: block !important;
+            position: absolute !important;
+            top: 0 !important;
+            left: 0 !important;
+            width: 100% !important;
+            background: white !important;
+            z-index: 99999 !important;
           }
 
-          /* Estilo da Ficha */
+          /* Estilização da Ficha para máxima legibilidade térmica */
           .print-ticket-container {
-            box-shadow: none !important;
-            border: 1px solid black !important;
-            border-radius: 0 !important;
+            border: 1px solid #000000 !important;
             width: 100% !important;
-            max-width: none !important;
-            margin: 0 !important;
-            padding: 4px !important;
-            page-break-after: always;
-            color: black !important;
-            display: block !important;
-          }
-
-          /* Força as cores em impressoras térmicas */
-          * {
-            -webkit-print-color-adjust: exact !important;
-            print-color-adjust: exact !important;
-            color: black !important;
+            margin: 0 0 10px 0 !important;
+            padding: 10px !important;
+            page-break-after: always !important;
           }
 
           .bg-black {
-            background-color: black !important;
+            background-color: #000000 !important;
           }
 
           .text-white {
-            color: white !important;
+            color: #ffffff !important;
           }
 
           .category-header {
             font-size: 16px !important;
             font-weight: 900 !important;
-            border-bottom: 3px solid black !important;
+            border-bottom: 2px solid #000000 !important;
             padding: 4px 0 !important;
-            margin-bottom: 8px !important;
-            display: flex !important;
-            background-color: #f3f4f6 !important;
-            -webkit-print-color-adjust: exact;
-            color-adjust: exact;
+            margin-bottom: 5px !important;
+            background-color: #f0f0f0 !important;
           }
 
           .item-row {
             font-size: 14px !important;
             font-weight: 900 !important;
-            margin-bottom: 4px !important;
-            display: flex !important;
+            margin-bottom: 3px !important;
           }
 
-          .item-row span.font-black.text-base {
-            font-size: 18px !important;
-          }
-
-          /* Esconde elementos específicos do modal que não devem ser impressos */
-          .no-print, 
-          button, 
-          .bg-neutral-950, 
-          .border-neutral-800,
-          .bg-neutral-900,
-          .bg-black\/85 {
-            display: none !important;
+          /* Garante que imagens e logos (se houver) apareçam em preto puro */
+          img, svg {
+            filter: grayscale(100%) contrast(1000%) !important;
           }
         }
       `}</style>
