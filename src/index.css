@@ -7,100 +7,115 @@
 }
 
 @media print {
+  /* Hides the entire React application view so it does not interfere or reserve blank space */
+  #root {
+    display: none !important;
+  }
+
+  /* Displays and formats the print-only root container perfectly */
+  #printfood-print-section {
+    display: block !important;
+    position: absolute !important;
+    left: 0 !important;
+    top: 0 !important;
+    width: 100% !important;
+    margin: 0 !important;
+    padding: 0 !important;
+    background: white !important;
+    box-sizing: border-box !important;
+    break-after: always !important;
+    break-before: always !important;
+    overflow: hidden !important;
+  }
+
+  /* Force zero margins on the physical print sheet */
   @page {
     margin: 0 !important;
+    padding: 0 !important;
     size: auto;
   }
 
   html, body {
     margin: 0 !important;
     padding: 0 !important;
-    height: auto !important;
-    min-height: 0 !important;
     background: white !important;
     color: black !important;
-    overflow: visible !important;
-  }
-
-  /* Hide everything and collapse their height so they don't push content or pages down */
-  body * {
-    visibility: hidden !important;
-    height: 0 !important;
-    min-height: 0 !important;
-    padding: 0 !important;
-    margin: 0 !important;
-    border: none !important;
-    box-shadow: none !important;
-    overflow: hidden !important;
-  }
-
-  /* Restore layout specifically for ticket elements and all descendants */
-  #printfood-printable-ticket,
-  #printfood-printable-ticket *,
-  #printfood-closure-printable,
-  #printfood-closure-printable * {
-    visibility: visible !important;
     height: auto !important;
-    min-height: auto !important;
+    min-height: 0 !important;
     overflow: visible !important;
-    font-weight: 900 !important;
+  }
+
+  /* Global element styles for the thermal printed output */
+  * {
     color: black !important;
     background: transparent !important;
     -webkit-print-color-adjust: exact !important;
     print-color-adjust: exact !important;
+    font-family: 'Courier New', Courier, monospace !important;
+    box-sizing: border-box !important;
   }
 
-  /* Position the print content at the absolute top left of the print page */
-  #printfood-printable-ticket,
-  #printfood-closure-printable {
-    position: absolute !important;
-    left: 0 !important;
-    top: 0 !important;
+  .print-ticket-container {
+    border: 1px solid black !important;
+    border-radius: 0 !important;
+    box-shadow: none !important;
     width: 100% !important;
-    max-width: 100% !important;
-    margin: 0 !important;
-    padding: 4px 8px !important;
+    margin: 0 0 8px 0 !important;
+    padding: 6px !important;
+    page-break-after: always !important;
+    color: black !important;
     background: white !important;
     display: block !important;
   }
 
-  /* Flatten nested cards so they are borderless, unrounded, flat and fit the paper width roll perfectly */
-  #printfood-printable-ticket > div,
-  #printfood-closure-printable > div {
-    border: none !important;
-    border-radius: 0 !important;
-    box-shadow: none !important;
-    margin: 0 !important;
-    padding: 0 !important;
-    width: 100% !important;
-    max-width: 100% !important;
-    background: white !important;
-    color: black !important;
+  .bg-black {
+    background-color: black !important;
+    color: white !important;
   }
 
-  /* Optimize font scaling for maximum thermal print legibility */
-  .text-xs {
-    font-size: 11px !important;
+  .text-white {
+    color: white !important;
   }
-  .text-sm {
+
+  /* Category Header for thermal print */
+  .category-header {
+    font-size: 15px !important;
+    font-weight: 900 !important;
+    border-bottom: 2px solid black !important;
+    padding: 3px 0 !important;
+    margin-bottom: 6px !important;
+    background-color: #f0f0f0 !important;
+    display: flex !important;
+  }
+
+  .item-row {
     font-size: 13px !important;
+    font-weight: 900 !important;
+    margin-bottom: 3px !important;
+    display: flex !important;
   }
-  .text-base {
-    font-size: 14px !important;
+
+  .item-row span.font-black.text-base {
+    font-size: 16px !important;
   }
-  .text-lg {
-    font-size: 18px !important;
+
+  /* Optimize images/logos for thermal */
+  img, svg {
+    filter: grayscale(100%) contrast(1000%) !important;
   }
-  .text-xl {
-    font-size: 20px !important;
-  }
-  
-  /* Ensure borders inside the ticket are solid black thin divider lines */
+
+  /* Dividers */
   .border-b, .border-t, .border-dashed {
     border-color: black !important;
     border-style: dashed !important;
     height: auto !important;
     margin-top: 4px !important;
     margin-bottom: 4px !important;
+  }
+}
+
+@media screen {
+  #printfood-print-section {
+    display: none !important;
   }
 }

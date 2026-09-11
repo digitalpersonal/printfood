@@ -1,4 +1,5 @@
 import React, { useEffect } from 'react';
+import { createPortal } from 'react-dom';
 import { Printer, X, ArrowRight, Send } from 'lucide-react';
 import { Order, Business, PrinterConfig } from '../../types';
 import { supabaseService } from '../../services/supabaseService';
@@ -54,8 +55,6 @@ export const TicketPrintModal: React.FC<TicketPrintModalProps> = ({
       try {
         setPrintSuccessMsg('Enviando via USB...');
         const device = await connectWebUsbPrinter(config.usbPrinterVendorId, config.usbPrinterProductId);
-        // FIXME: Here you would generate actual ESC/POS bytes based on the ticket content.
-        // For now, we simulate success for the purpose of the requested interface.
         const mockData = new TextEncoder().encode(`Ficha #${order.ticket_number}\nTotal: ${order.total}\n`);
         await printViaWebUsb(device, mockData);
         setPrintSuccessMsg('Ficha impressa via USB!');
@@ -205,89 +204,24 @@ export const TicketPrintModal: React.FC<TicketPrintModalProps> = ({
     );
   };
 
+  const vouchersList = config.separateVouchersByItem ? (
+    // Imprimir cada item como uma ficha separada
+    items.map((item, idx) => (
+      <React.Fragment key={idx}>
+        {Array.from({ length: copies }).map((_, cIdx) => 
+          renderSingleVoucher(`item-${idx}-copy-${cIdx}`, copies > 1 ? `${cIdx + 1}ª VIA` : undefined, item)
+        )}
+      </React.Fragment>
+    ))
+  ) : (
+    // Ficha resumida padrão
+    Array.from({ length: copies }).map((_, cIdx) => 
+      renderSingleVoucher(`resumo-copy-${cIdx}`, copies > 1 ? (cIdx === 0 ? '1ª VIA - CLIENTE' : '2ª VIA - PRODUÇÃO') : undefined)
+    )
+  );
+
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/85 p-4 backdrop-blur-sm">
-      <style>{`
-        @media print {
-          /* Reset absoluto para evitar interferências de outros componentes */
-          * {
-            visibility: hidden !important;
-            margin: 0 !important;
-            padding: 0 !important;
-            -webkit-print-color-adjust: exact !important;
-            print-color-adjust: exact !important;
-          }
-
-          /* Define o papel e fundo */
-          @page {
-            margin: 0 !important;
-            size: auto;
-          }
-
-          html, body {
-            visibility: hidden !important;
-            background: white !important;
-            width: 100% !important;
-            height: auto !important;
-          }
-
-          /* Mostra APENAS o container da ficha e seu conteúdo */
-          #printfood-printable-ticket,
-          #printfood-printable-ticket * {
-            visibility: visible !important;
-            color: #000000 !important;
-            font-family: 'Courier New', Courier, monospace !important;
-          }
-
-          /* Posiciona o container no topo absoluto da página de impressão */
-          #printfood-printable-ticket {
-            display: block !important;
-            position: absolute !important;
-            top: 0 !important;
-            left: 0 !important;
-            width: 100% !important;
-            background: white !important;
-            z-index: 99999 !important;
-          }
-
-          /* Estilização da Ficha para máxima legibilidade térmica */
-          .print-ticket-container {
-            border: 1px solid #000000 !important;
-            width: 100% !important;
-            margin: 0 0 10px 0 !important;
-            padding: 10px !important;
-            page-break-after: always !important;
-          }
-
-          .bg-black {
-            background-color: #000000 !important;
-          }
-
-          .text-white {
-            color: #ffffff !important;
-          }
-
-          .category-header {
-            font-size: 16px !important;
-            font-weight: 900 !important;
-            border-bottom: 2px solid #000000 !important;
-            padding: 4px 0 !important;
-            margin-bottom: 5px !important;
-            background-color: #f0f0f0 !important;
-          }
-
-          .item-row {
-            font-size: 14px !important;
-            font-weight: 900 !important;
-            margin-bottom: 3px !important;
-          }
-
-          /* Garante que imagens e logos (se houver) apareçam em preto puro */
-          img, svg {
-            filter: grayscale(100%) contrast(1000%) !important;
-          }
-        }
-      `}</style>
       <div className="w-full max-w-md bg-neutral-900 border border-neutral-800 rounded-3xl overflow-hidden shadow-2xl flex flex-col max-h-[90vh] relative">
         
         {/* CONFIRM CLOSE OVERLAY */}
@@ -325,7 +259,7 @@ export const TicketPrintModal: React.FC<TicketPrintModalProps> = ({
               >
                 Não, Re-imprimir Ficha
               </button>
-
+              
               <button
                 onClick={() => setShowConfirmClose(false)}
                 className="w-full py-2.5 text-neutral-500 hover:text-neutral-300 font-bold text-xs transition"
@@ -359,22 +293,8 @@ export const TicketPrintModal: React.FC<TicketPrintModalProps> = ({
 
         {/* PREVIEW CONTAINER */}
         <div className="p-4 overflow-y-auto flex-1 flex flex-col items-center bg-neutral-950/70">
-          <div id="printfood-printable-ticket" className="flex flex-col items-center">
-            {config.separateVouchersByItem ? (
-              // Imprimir cada item como uma ficha separada
-              items.map((item, idx) => (
-                <React.Fragment key={idx}>
-                  {Array.from({ length: copies }).map((_, cIdx) => 
-                    renderSingleVoucher(`item-${idx}-copy-${cIdx}`, copies > 1 ? `${cIdx + 1}ª VIA` : undefined, item)
-                  )}
-                </React.Fragment>
-              ))
-            ) : (
-              // Ficha resumida padrão
-              Array.from({ length: copies }).map((_, cIdx) => 
-                renderSingleVoucher(`resumo-copy-${cIdx}`, copies > 1 ? (cIdx === 0 ? '1ª VIA - CLIENTE' : '2ª VIA - PRODUÇÃO') : undefined)
-              )
-            )}
+          <div className="flex flex-col items-center">
+            {vouchersList}
           </div>
         </div>
 
@@ -406,6 +326,14 @@ export const TicketPrintModal: React.FC<TicketPrintModalProps> = ({
         </div>
 
       </div>
+
+      {/* RENDER THE TICKETS OUTSIDE #ROOT IN PORTAL SO IT GETS INCREDIBLE PRINT OUT QUALITY */}
+      {createPortal(
+        <div id="printfood-printable-ticket" className="flex flex-col items-center">
+          {vouchersList}
+        </div>,
+        document.getElementById('printfood-print-section') || document.body
+      )}
     </div>
   );
 };

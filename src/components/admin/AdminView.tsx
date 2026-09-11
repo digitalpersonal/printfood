@@ -1,4 +1,5 @@
 import React, { useEffect, useState } from 'react';
+import { createPortal } from 'react-dom';
 import { supabaseService } from '../../services/supabaseService';
 import { Business, Order, PrintJob } from '../../types';
 import { DollarSign, ShoppingBag, TrendingUp, UtensilsCrossed, ArrowRight, Printer, Filter, RefreshCw, Trash2 } from 'lucide-react';
@@ -318,9 +319,9 @@ export const AdminView: React.FC<AdminViewProps> = ({ business, onNavigateToProd
 
       </div>
 
-      {/* HIDDEN THERMAL PRINTABLE CLOSURE REPORT */}
-      <div className="hidden">
-        <div id="printfood-closure-printable" className="bg-white text-neutral-900 p-4 font-mono text-xs w-[80mm]">
+      {/* HIDDEN THERMAL PRINTABLE CLOSURE REPORT VIA REACT PORTAL */}
+      {createPortal(
+        <div id="printfood-closure-printable" className="print-ticket-container bg-white text-neutral-900 p-4 font-mono text-xs w-[80mm]">
           <div className="text-center border-b border-dashed border-neutral-400 pb-3 mb-3">
             <div className="text-xl font-black uppercase text-neutral-950 font-['Plus_Jakarta_Sans',sans-serif]">
               PRINT<span className="text-orange-600">FOOD</span>
@@ -362,8 +363,9 @@ export const AdminView: React.FC<AdminViewProps> = ({ business, onNavigateToProd
           <div className="mt-8 pt-4 border-t border-neutral-400 text-center text-[9px] text-neutral-500">
             Assinatura do Operador / Gerente
           </div>
-        </div>
-      </div>
+        </div>,
+        document.getElementById('printfood-print-section') || document.body
+      )}
 
     </div>
   );
