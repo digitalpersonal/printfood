@@ -15,13 +15,17 @@ export const printHtmlViaIframe = (htmlContent: string) => {
   iframe.id = 'printfood-silent-iframe';
   
   // Style it to be completely hidden offscreen and 0px dimensions
-  iframe.style.position = 'fixed';
-  iframe.style.right = '0';
-  iframe.style.bottom = '0';
+  iframe.style.position = 'absolute';
   iframe.style.width = '0';
   iframe.style.height = '0';
   iframe.style.border = 'none';
+  iframe.style.overflow = 'hidden';
   iframe.style.visibility = 'hidden';
+  iframe.style.display = 'block'; // Must be block for some browsers to allow printing
+  iframe.style.opacity = '0';
+  iframe.style.pointerEvents = 'none';
+  iframe.style.left = '-9999px';
+  iframe.style.top = '-9999px';
   
   document.body.appendChild(iframe);
 
@@ -65,14 +69,14 @@ export const printHtmlViaIframe = (htmlContent: string) => {
             box-sizing: border-box !important;
           }
 
-          /* Main Ticket Container Styling */
+          /* Main Ticket Container Styling - REMOVED OUTER BORDERS PER USER REQUEST */
           .print-ticket-container {
-            border: 2px solid black !important;
-            border-radius: 12px !important;
+            border: none !important;
+            border-radius: 0 !important;
             box-shadow: none !important;
             width: 100% !important;
-            margin: 0 auto 8px auto !important;
-            padding: 16px !important;
+            margin: 0 auto !important;
+            padding: 4px 0 !important;
             page-break-after: always !important;
             break-after: always !important;
             color: black !important;
@@ -109,6 +113,7 @@ export const printHtmlViaIframe = (htmlContent: string) => {
           .mb-1 { margin-bottom: 4px !important; }
           .mb-2 { margin-bottom: 8px !important; }
           .mb-3 { margin-bottom: 12px !important; }
+          .mb-4 { margin-bottom: 16px !important; }
           .mt-0\\.5 { margin-top: 2px !important; }
           .mt-1\\.5 { margin-top: 6px !important; }
           
@@ -170,6 +175,7 @@ export const printHtmlViaIframe = (htmlContent: string) => {
           .items-center { align-items: center !important; }
           .items-start { align-items: flex-start !important; }
           .space-y-1\\.5 > * + * { margin-top: 6px !important; }
+          .space-y-3 > * + * { margin-top: 12px !important; }
           .space-y-4 > * + * { margin-top: 16px !important; }
           .mr-1 { margin-right: 4px !important; }
           .pr-2 { padding-right: 8px !important; }
@@ -188,6 +194,7 @@ export const printHtmlViaIframe = (htmlContent: string) => {
             margin-top: 4px !important;
             margin-bottom: 4px !important;
           }
+          .border-b-2 { border-bottom-width: 2px !important; border-bottom-style: dashed !important; }
           
           .w-\\[80mm\\] {
             width: 80mm !important;
@@ -204,16 +211,22 @@ export const printHtmlViaIframe = (htmlContent: string) => {
         </style>
       </head>
       <body>
-        ${htmlContent}
-        <script>
-          window.onload = function() {
-            setTimeout(function() {
-              window.print();
-            }, 100);
-          };
-        <\/script>
+        <div style="width: 100%; display: flex; flex-direction: column; align-items: center;">
+          ${htmlContent}
+        </div>
       </body>
     </html>
   `);
   iframeDoc.close();
+
+  // Wait for iframe content to load and styles to apply, then print
+  setTimeout(() => {
+    try {
+      iframe.contentWindow?.focus();
+      iframe.contentWindow?.print();
+    } catch (e) {
+      console.error('Silent print failed, falling back to window.print', e);
+      window.print();
+    }
+  }, 250);
 };

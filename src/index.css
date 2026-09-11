@@ -56,7 +56,7 @@
   }
 
   .print-ticket-container {
-    border: 1px solid black !important;
+    border: none !important;
     border-radius: 0 !important;
     box-shadow: none !important;
     width: 100% !important;
