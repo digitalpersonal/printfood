@@ -4,7 +4,6 @@ import { Printer, X, ArrowRight, Send } from 'lucide-react';
 import { Order, Business, PrinterConfig } from '../../types';
 import { supabaseService } from '../../services/supabaseService';
 import { connectWebUsbPrinter, printViaWebUsb } from '../../lib/webUsbPrinter';
-import { printHtmlViaIframe } from '../../lib/iframePrinter';
 
 interface TicketPrintModalProps {
   isOpen: boolean;
@@ -70,12 +69,7 @@ export const TicketPrintModal: React.FC<TicketPrintModalProps> = ({
       }
     } else {
       setPrintSuccessMsg(config.directPrinting ? 'Enviando para impressora...' : 'Janela de impressão aberta!');
-      const printElement = document.getElementById('printfood-printable-ticket');
-      if (printElement) {
-        printHtmlViaIframe(printElement.outerHTML);
-      } else {
-        window.print();
-      }
+      window.print();
     }
     setTimeout(() => setPrintSuccessMsg(null), 4000);
   };
@@ -114,7 +108,7 @@ export const TicketPrintModal: React.FC<TicketPrintModalProps> = ({
     return (
       <div 
         key={uniqueKey}
-        className={`bg-white text-black print-ticket-container p-2 sm:p-3 font-mono text-sm mb-4 ${
+        className={`bg-white text-black rounded-xl print-ticket-container p-4 sm:p-5 shadow-lg font-mono text-sm border-2 border-black mb-4 ${
           is58mm ? 'w-full max-w-[240px]' : isA4 ? 'w-full max-w-[500px]' : 'w-full max-w-[320px]'
         }`}
       >
