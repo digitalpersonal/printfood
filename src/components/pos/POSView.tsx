@@ -41,6 +41,22 @@ export const POSView: React.FC<POSViewProps> = ({ business, categories, products
   const [completedOrder, setCompletedOrder] = useState<Order | null>(null);
   const [completedItems, setCompletedItems] = useState<{ name: string; quantity: number; unitPrice: number; total: number }[]>([]);
   
+  interface RecentOrder {
+    order: Order;
+    items: { name: string; quantity: number; unitPrice: number; total: number }[];
+  }
+
+  const [recentOrders, setRecentOrders] = useState<RecentOrder[]>(() => {
+    const saved = business ? localStorage.getItem(`printfood_recent_orders_${business.id}`) : null;
+    return saved ? JSON.parse(saved) : [];
+  });
+
+  useEffect(() => {
+    if (business) {
+      localStorage.setItem(`printfood_recent_orders_${business.id}`, JSON.stringify(recentOrders));
+    }
+  }, [recentOrders, business]);
+  
   // Attendant and Printer config
   const [activeAttendant, setActiveAttendant] = useState<Attendant | null>(supabaseService.getActiveAttendant());
   const [allAttendants, setAllAttendants] = useState<Attendant[]>([]);
@@ -98,13 +114,17 @@ export const POSView: React.FC<POSViewProps> = ({ business, categories, products
   const handleConfirmPayment = async (method: PaymentMethod, customerName: string) => {
     if (!business) return;
     
-    const items = cart.map(i => ({
-      product_id: i.product.id,
-      product_name: i.product.name,
-      quantity: i.quantity,
-      unit_price: i.product.price,
-      total: i.product.price * i.quantity
-    }));
+    const items = cart.map(i => {
+      const category = categories.find((c: Category) => c.id === i.product.category_id);
+      return {
+        product_id: i.product.id,
+        product_name: i.product.name,
+        category_name: category?.name || 'Diversos',
+        quantity: i.quantity,
+        unit_price: i.product.price,
+        total: i.product.price * i.quantity
+      };
+    });
 
     const orderData = {
       business_id: business.id,
@@ -129,6 +149,7 @@ export const POSView: React.FC<POSViewProps> = ({ business, categories, products
           customer_name: order.customer_name || undefined,
           items: items.map(item => ({
             name: item.product_name,
+            categoryName: item.category_name,
             quantity: item.quantity,
             unitPrice: item.unit_price,
             total: item.total
@@ -139,12 +160,15 @@ export const POSView: React.FC<POSViewProps> = ({ business, categories, products
       }
 
       setCompletedOrder(order);
-      setCompletedItems(items.map(item => ({
+      const newItems = items.map(item => ({
         name: item.product_name,
+        categoryName: item.category_name,
         quantity: item.quantity,
         unitPrice: item.unit_price,
         total: item.total
-      })));
+      }));
+      setCompletedItems(newItems);
+      setRecentOrders(prev => [{ order, items: newItems }, ...prev].slice(0, 3));
       setCart([]);
       onOrderCompleted();
     }
@@ -352,8 +376,8 @@ export const POSView: React.FC<POSViewProps> = ({ business, categories, products
           )}
         </div>
 
-        <div className="p-4 bg-neutral-950 border-t border-neutral-800">
-          <div className="flex justify-between items-baseline mb-4">
+        <div className="p-4 bg-neutral-950 border-t border-neutral-800 space-y-3">
+          <div className="flex justify-between items-baseline mb-2">
             <span className="text-neutral-400 font-bold text-xs uppercase">Total</span>
             <span className="text-3xl font-black text-white">{formatMoney(cartTotal)}</span>
           </div>
@@ -366,6 +390,46 @@ export const POSView: React.FC<POSViewProps> = ({ business, categories, products
           >
             <DollarSign className="w-6 h-6" /> PAGAR
           </button>
+
+          {/* ÚLTIMOS PEDIDOS (REIMPRESSÃO RÁPIDA) */}
+          {recentOrders.length > 0 && (
+            <div className="pt-3 border-t border-neutral-800 space-y-2">
+              <div className="flex items-center justify-between">
+                <span className="text-[11px] font-bold text-neutral-400 uppercase tracking-wider">Últimos Tickets (Reimpressão)</span>
+                <span className="text-[10px] text-neutral-500">Últimos 3</span>
+              </div>
+              <div className="space-y-1.5">
+                {recentOrders.map((ro, idx) => (
+                  <div key={ro.order.id || idx} className="bg-neutral-900 border border-neutral-800 rounded-xl p-2.5 flex items-center justify-between text-xs">
+                    <div className="min-w-0 pr-2 flex-1">
+                      <div className="flex items-center gap-1.5">
+                        <span className="font-black text-orange-400">#{ro.order.ticket_number}</span>
+                        <span className="text-white font-bold truncate">
+                          {ro.items.map(i => `${i.quantity}x ${i.name}`).join(', ')}
+                        </span>
+                      </div>
+                      <div className="text-[10px] text-neutral-400 mt-0.5">
+                        {formatMoney(ro.order.total)} • {new Date(ro.order.created_at).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })}
+                      </div>
+                    </div>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        playBeep();
+                        setCompletedOrder(ro.order);
+                        setCompletedItems(ro.items);
+                      }}
+                      className="p-2 bg-neutral-800 hover:bg-orange-600 text-neutral-200 hover:text-white rounded-xl transition shrink-0 flex items-center gap-1 text-[11px] font-bold"
+                      title="Reimprimir ficha"
+                    >
+                      <Printer className="w-3.5 h-3.5" />
+                      <span>Reimprimir</span>
+                    </button>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
         </div>
       </div>
 

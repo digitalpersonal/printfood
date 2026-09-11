@@ -86,6 +86,7 @@ export interface PrinterConfig {
   useCompactTemplate?: boolean;
   usbPrinterVendorId?: number;
   usbPrinterProductId?: number;
+  autoCleanupHours?: number;
   categoryMappings?: Record<string, { vendorId: number; productId: number; deviceName: string }>;
 }
 
@@ -97,7 +98,7 @@ export interface PrintJob {
   source_device: string;
   attendant_name?: string;
   customer_name?: string;
-  items: { name: string; quantity: number; unitPrice: number; total: number }[];
+  items: { name: string; categoryName?: string; quantity: number; unitPrice: number; total: number }[];
   total: number;
   payment_method: string;
   status: 'pending' | 'printed' | 'failed';

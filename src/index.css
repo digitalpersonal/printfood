@@ -7,34 +7,100 @@
 }
 
 @media print {
-  body {
+  @page {
+    margin: 0 !important;
+    size: auto;
+  }
+
+  html, body {
+    margin: 0 !important;
+    padding: 0 !important;
+    height: auto !important;
+    min-height: 0 !important;
     background: white !important;
     color: black !important;
+    overflow: visible !important;
   }
-  
+
+  /* Hide everything and collapse their height so they don't push content or pages down */
   body * {
-    visibility: hidden;
+    visibility: hidden !important;
+    height: 0 !important;
+    min-height: 0 !important;
+    padding: 0 !important;
+    margin: 0 !important;
+    border: none !important;
+    box-shadow: none !important;
+    overflow: hidden !important;
   }
-  
+
+  /* Restore layout specifically for ticket elements and all descendants */
   #printfood-printable-ticket,
   #printfood-printable-ticket *,
   #printfood-closure-printable,
   #printfood-closure-printable * {
-    visibility: visible;
+    visibility: visible !important;
+    height: auto !important;
+    min-height: auto !important;
+    overflow: visible !important;
+    font-weight: 900 !important;
+    color: black !important;
+    background: transparent !important;
+    -webkit-print-color-adjust: exact !important;
+    print-color-adjust: exact !important;
   }
-  
+
+  /* Position the print content at the absolute top left of the print page */
   #printfood-printable-ticket,
   #printfood-closure-printable {
-    position: absolute;
-    left: 0;
-    top: 0;
-    width: 80mm;
-    max-width: 100%;
-    margin: 0 auto;
-    padding: 12px;
+    position: absolute !important;
+    left: 0 !important;
+    top: 0 !important;
+    width: 100% !important;
+    max-width: 100% !important;
+    margin: 0 !important;
+    padding: 4px 8px !important;
+    background: white !important;
+    display: block !important;
+  }
+
+  /* Flatten nested cards so they are borderless, unrounded, flat and fit the paper width roll perfectly */
+  #printfood-printable-ticket > div,
+  #printfood-closure-printable > div {
+    border: none !important;
+    border-radius: 0 !important;
+    box-shadow: none !important;
+    margin: 0 !important;
+    padding: 0 !important;
+    width: 100% !important;
+    max-width: 100% !important;
     background: white !important;
     color: black !important;
-    box-shadow: none !important;
-    border: none !important;
+  }
+
+  /* Optimize font scaling for maximum thermal print legibility */
+  .text-xs {
+    font-size: 11px !important;
+  }
+  .text-sm {
+    font-size: 13px !important;
+  }
+  .text-base {
+    font-size: 14px !important;
+  }
+  .text-lg {
+    font-size: 18px !important;
+  }
+  .text-xl {
+    font-size: 20px !important;
+  }
+  
+  /* Ensure borders inside the ticket are solid black thin divider lines */
+  .border-b, .border-t, .border-dashed {
+    border-color: black !important;
+    border-style: dashed !important;
+    height: auto !important;
+    margin-top: 4px !important;
+    margin-bottom: 4px !important;
   }
 }

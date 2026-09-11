@@ -188,6 +188,30 @@ export default function App() {
     };
   }, [business]);
 
+  // Serviço de Backup Automático (IndexedDB)
+  useEffect(() => {
+    if (!business) return;
+
+    const runBackup = async () => {
+      console.log('[Backup] Iniciando backup automático para IndexedDB...');
+      const count = await supabaseService.backupRecentOrdersToOffline(business.id);
+      if (count > 0) {
+        console.log(`[Backup] Sucesso: ${count} pedidos sincronizados offline.`);
+      }
+    };
+
+    // Executa uma vez no início (com um pequeno delay para não pesar no boot)
+    const initialTimeout = setTimeout(runBackup, 10000);
+    
+    // Agenda a cada 30 minutos
+    const interval = setInterval(runBackup, 30 * 60 * 1000);
+
+    return () => {
+      clearTimeout(initialTimeout);
+      clearInterval(interval);
+    };
+  }, [business]);
+
   const handlePrintRemoteJob = (job: PrintJob) => {
     const mockOrder: Order = {
       id: job.order_id || 'rem-' + Date.now(),

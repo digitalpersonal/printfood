@@ -8,7 +8,7 @@ interface TicketPrintModalProps {
   isOpen: boolean;
   onClose: () => void;
   order: Order | null;
-  items: { name: string; quantity: number; unitPrice: number; total: number }[];
+  items: { name: string; categoryName?: string; quantity: number; unitPrice: number; total: number }[];
   business: Business | null;
 }
 
@@ -45,7 +45,7 @@ export const TicketPrintModal: React.FC<TicketPrintModalProps> = ({
         source_device: 'Mobile (Operador)',
         attendant_name: order.attendant_name || 'Operador',
         customer_name: order.customer_name || undefined,
-        items: items.map(i => ({ name: i.name, quantity: i.quantity, unitPrice: i.unitPrice, total: i.total })),
+        items: items.map(i => ({ name: i.name, categoryName: i.categoryName, quantity: i.quantity, unitPrice: i.unitPrice, total: i.total })),
         total: order.total,
         payment_method: order.payment_method
       });
@@ -95,99 +95,199 @@ export const TicketPrintModal: React.FC<TicketPrintModalProps> = ({
   const orderDate = new Date(order.created_at || Date.now()).toLocaleDateString('pt-BR');
 
   // Single ticket render
-  const renderSingleVoucher = (uniqueKey: string, copyLabel?: string, specificItem?: { name: string; quantity: number; total: number }) => (
-    <div 
-      key={uniqueKey}
-      className={`bg-white text-black rounded-xl ${config.useCompactTemplate ? 'p-2' : 'p-4 sm:p-5'} shadow-lg font-mono text-xs border border-black mb-4 ${
-        is58mm ? 'w-full max-w-[240px]' : isA4 ? 'w-full max-w-[500px]' : 'w-full max-w-[320px]'
-      }`}
-    >
-      {/* LOGOMARCA & CABEÇALHO */}
-      {!config.useCompactTemplate && (
-        <div className="text-center border-b border-dashed border-black pb-2.5 mb-2.5">
-          <div className="flex items-center justify-center gap-1 text-xl font-black tracking-tight text-black font-['Plus_Jakarta_Sans',sans-serif]">
-            <span>Print</span>
-            <span className="text-black">Food</span>
-          </div>
-          
-          {config.headerCustomText && (
-            <div className="text-[10px] font-black text-black uppercase mt-0.5 tracking-wider">
-              {config.headerCustomText}
-            </div>
-          )}
+  const renderSingleVoucher = (uniqueKey: string, copyLabel?: string, specificItem?: { name: string; categoryName?: string; quantity: number; total: number }) => {
+    // Group items by category if no specific item is provided
+    const groupedItems: Record<string, typeof items> = {};
+    if (!specificItem) {
+      items.forEach(item => {
+        const cat = item.categoryName || 'Diversos';
+        if (!groupedItems[cat]) groupedItems[cat] = [];
+        groupedItems[cat].push(item);
+      });
+    }
 
-          <div className="text-[11px] font-black text-black uppercase">
-            {business?.name || 'Caixa Central'}
-          </div>
-          <div className="text-[10px] text-black">
-            {orderDate} às {orderTime}
-          </div>
-          {order.attendant_name && (
-            <div className="text-[10px] font-black text-black">
-              Atendente: {order.attendant_name}
+    return (
+      <div 
+        key={uniqueKey}
+        className={`bg-white text-black rounded-xl print-ticket-container ${config.useCompactTemplate ? 'p-2' : 'p-4 sm:p-5'} shadow-lg font-mono text-xs border border-black mb-4 ${
+          is58mm ? 'w-full max-w-[240px]' : isA4 ? 'w-full max-w-[500px]' : 'w-full max-w-[320px]'
+        }`}
+      >
+        {/* LOGOMARCA & CABEÇALHO */}
+        {!config.useCompactTemplate && (
+          <div className="text-center border-b border-dashed border-black pb-2.5 mb-2.5">
+            <div className="flex items-center justify-center gap-1 text-xl font-black tracking-tight text-black font-['Plus_Jakarta_Sans',sans-serif]">
+              <span>Print</span>
+              <span className="text-black">Food</span>
             </div>
-          )}
-          {copyLabel && (
-            <div className="mt-1 inline-block px-2 py-0.5 bg-neutral-200 text-neutral-800 rounded text-[9px] font-black uppercase">
-              {copyLabel}
+            
+            {config.headerCustomText && (
+              <div className="text-[10px] font-black text-black uppercase mt-0.5 tracking-wider">
+                {config.headerCustomText}
+              </div>
+            )}
+
+            <div className="text-[11px] font-black text-black uppercase">
+              {business?.name || 'Caixa Central'}
             </div>
-          )}
+            <div className="text-[10px] text-black">
+              {orderDate} às {orderTime}
+            </div>
+            {order.attendant_name && (
+              <div className="text-[10px] font-black text-black">
+                Atendente: {order.attendant_name}
+              </div>
+            )}
+            {copyLabel && (
+              <div className="mt-1 inline-block px-2 py-0.5 bg-neutral-200 text-neutral-800 rounded text-[9px] font-black uppercase">
+                {copyLabel}
+              </div>
+            )}
+          </div>
+        )}
+
+        {/* DESTAQUE NÚMERO DA FICHA */}
+        <div className={`text-center ${config.useCompactTemplate ? 'py-1' : 'py-2'} bg-black rounded-lg border border-black mb-3`}>
+          <div className="text-[10px] font-black tracking-widest text-white uppercase">
+            {specificItem ? 'VALE RETIRADA - ITEM' : 'FICHA'} #{order.ticket_number}
+          </div>
         </div>
-      )}
 
-      {/* DESTAQUE NÚMERO DA FICHA */}
-      <div className={`text-center ${config.useCompactTemplate ? 'py-1' : 'py-2'} bg-black rounded-lg border border-black mb-3`}>
-        <div className="text-[10px] font-black tracking-widest text-white uppercase">
-          {specificItem ? 'VALE RETIRADA - ITEM' : 'FICHA'} #{order.ticket_number}
+        {/* CONTEÚDO: SEPARADO POR ITEM OU LISTA COMPLETA */}
+        {specificItem ? (
+          <div className="border-b border-dashed border-black pb-2.5 mb-2.5 text-center">
+            {specificItem.categoryName && (
+              <div className="category-header text-[12px] font-black border-b-2 border-black mb-1 bg-neutral-100 py-0.5">
+                {specificItem.categoryName}
+              </div>
+            )}
+            <div className={`text-lg font-black text-black ${config.useCompactTemplate ? 'font-mono' : ''}`}>
+              {specificItem.quantity}x {specificItem.name}
+            </div>
+            <div className="text-[11px] font-black text-black mt-0.5">
+              Valor: {formatMoney(specificItem.total)}
+            </div>
+          </div>
+        ) : (
+          <div className={`border-b border-dashed border-black ${config.useCompactTemplate ? 'pb-1 mb-1' : 'pb-2.5 mb-2.5'} space-y-3`}>
+            {Object.entries(groupedItems).map(([cat, catItems]) => (
+              <div key={cat} className="space-y-1">
+                <div className="category-header text-[12px] font-black border-b-2 border-black mb-1 bg-neutral-100 py-0.5 px-1 flex justify-between items-center">
+                  <span>{cat}</span>
+                  <span className="text-[9px] font-normal opacity-70 italic no-print">Seção</span>
+                </div>
+                {catItems.map((item, idx) => (
+                  <div key={idx} className={`flex justify-between items-start text-sm font-black item-row ${config.useCompactTemplate ? 'font-mono' : ''}`}>
+                    <span className="pr-2">
+                      <span className="font-black text-base">{item.quantity}x</span> {item.name}
+                    </span>
+                    <span className="shrink-0">{formatMoney(item.total)}</span>
+                  </div>
+                ))}
+              </div>
+            ))}
+          </div>
+        )}
+
+        {/* TOTAL & FORMA DE PAGAMENTO */}
+        <div className="border-b border-dashed border-black pb-2 mb-2 space-y-0.5">
+          <div className="flex justify-between items-center text-xs font-black text-black">
+            <span>TOTAL:</span>
+            <span className="text-sm">{formatMoney(order.total)}</span>
+          </div>
+        </div>
+
+        {/* MENSAGEM DO RODAPÉ */}
+        <div className="text-center pt-1 text-[10px] font-black text-black uppercase">
+          {config.footerCustomText || '*** APRESENTE ESTA FICHA ***'}
         </div>
       </div>
-
-      {/* CONTEÚDO: SEPARADO POR ITEM OU LISTA COMPLETA */}
-      {specificItem ? (
-        <div className="border-b border-dashed border-black pb-2.5 mb-2.5 text-center">
-          <div className={`text-lg font-black text-black ${config.useCompactTemplate ? 'font-mono' : ''}`}>
-            {specificItem.quantity}x {specificItem.name}
-          </div>
-          <div className="text-[11px] font-black text-black mt-0.5">
-            Valor: {formatMoney(specificItem.total)}
-          </div>
-        </div>
-      ) : (
-        <div className={`border-b border-dashed border-black ${config.useCompactTemplate ? 'pb-1 mb-1' : 'pb-2.5 mb-2.5'} space-y-1`}>
-          {!config.useCompactTemplate && (
-            <div className="text-[10px] font-black text-black uppercase flex justify-between">
-              <span>ITEM</span>
-              <span>TOTAL</span>
-            </div>
-          )}
-          {items.map((item, idx) => (
-            <div key={idx} className={`flex justify-between items-start text-sm font-black ${config.useCompactTemplate ? 'font-mono' : ''}`}>
-              <span className="pr-2">
-                <span className="font-black">{item.quantity}x</span> {item.name}
-              </span>
-              <span className="shrink-0">{formatMoney(item.total)}</span>
-            </div>
-          ))}
-        </div>
-      )}
-
-      {/* TOTAL & FORMA DE PAGAMENTO */}
-      <div className="border-b border-dashed border-black pb-2 mb-2 space-y-0.5">
-        <div className="flex justify-between items-center text-xs font-black text-black">
-          <span>TOTAL:</span>
-          <span className="text-sm">{formatMoney(order.total)}</span>
-        </div>
-      </div>
-
-      {/* MENSAGEM DO RODAPÉ */}
-      <div className="text-center pt-1 text-[10px] font-black text-black uppercase">
-        {config.footerCustomText || '*** APRESENTE ESTA FICHA ***'}
-      </div>
-    </div>
-  );
+    );
+  };
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/85 p-4 backdrop-blur-sm">
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/85 p-4 backdrop-blur-sm no-print">
+      <style>{`
+        @media print {
+          /* Esconde absolutamente tudo na página */
+          body * {
+            visibility: hidden !important;
+          }
+          
+          /* Garante que o modal e o container da ficha fiquem visíveis */
+          .fixed.inset-0,
+          #printfood-printable-ticket,
+          #printfood-printable-ticket * {
+            visibility: visible !important;
+          }
+
+          /* Posiciona o container da ficha no topo esquerdo absoluto do papel */
+          #printfood-printable-ticket {
+            position: absolute !important;
+            left: 0 !important;
+            top: 0 !important;
+            width: 100% !important;
+            margin: 0 !important;
+            padding: 0 !important;
+          }
+
+          @page {
+            margin: 0 !important;
+            padding: 0 !important;
+            size: auto;
+          }
+
+          body {
+            margin: 0 !important;
+            padding: 0 !important;
+            background: white !important;
+          }
+
+          .print-ticket-container {
+            box-shadow: none !important;
+            border: 2px solid black !important;
+            border-radius: 0 !important;
+            width: 100% !important;
+            max-width: none !important;
+            margin: 0 0 10px 0 !important;
+            padding: 8px !important;
+            page-break-after: always;
+            color: black !important;
+            display: block !important;
+          }
+
+          .category-header {
+            font-size: 16px !important;
+            font-weight: 900 !important;
+            border-bottom: 3px solid black !important;
+            padding: 4px 0 !important;
+            margin-bottom: 8px !important;
+            display: flex !important;
+            background-color: #f3f4f6 !important;
+            -webkit-print-color-adjust: exact;
+            color-adjust: exact;
+          }
+
+          .item-row {
+            font-size: 14px !important;
+            font-weight: 900 !important;
+            margin-bottom: 4px !important;
+            display: flex !important;
+          }
+
+          .item-row span.font-black.text-base {
+            font-size: 18px !important;
+          }
+
+          /* Esconde elementos específicos do modal que não devem ser impressos */
+          .no-print, 
+          button, 
+          .bg-neutral-950, 
+          .border-neutral-800 {
+            display: none !important;
+          }
+        }
+      `}</style>
       <div className="w-full max-w-md bg-neutral-900 border border-neutral-800 rounded-3xl overflow-hidden shadow-2xl flex flex-col max-h-[90vh] relative">
         
         {/* CONFIRM CLOSE OVERLAY */}

@@ -15,6 +15,7 @@ const LOCAL_ADMIN_AUTH_KEY = 'printfood_admin_auth';
 
 export const supabaseService = {
   isDemoMode: false,
+  lastCleanupTime: 0,
 
   setDemoMode(enabled: boolean) {
     this.isDemoMode = enabled;
@@ -32,6 +33,31 @@ export const supabaseService = {
     } catch (err) {
       return { data: null, error: err };
     }
+  },
+
+  async updateBusiness(business: Business): Promise<Business> {
+    localStorage.setItem(LOCAL_BUSINESS_KEY, JSON.stringify(business));
+    
+    if (!this.isDemoMode && isSupabaseConfigured()) {
+      try {
+        const { data, error } = await supabase
+          .from('business')
+          .update({
+            name: business.name,
+            document: business.document,
+            phone: business.phone
+          })
+          .eq('id', business.id)
+          .select()
+          .single();
+
+        if (error) throw error;
+        return data;
+      } catch (err) {
+        console.warn('Erro ao atualizar empresa no Supabase, salvando local:', err);
+      }
+    }
+    return business;
   },
 
   async seedInitialData(): Promise<{ data: Business | null; error: any }> {
@@ -459,6 +485,9 @@ export const supabaseService = {
 
       if (oError || !order) throw oError;
 
+      // Backup imediato para IndexedDB para proteção contra perda de conexão
+      await saveOrderOffline(order);
+
       const itemsToInsert = items.map(item => ({
         ...item,
         order_id: order.id
@@ -691,6 +720,9 @@ export const supabaseService = {
   },
 
   async getPrintJobs(businessId: string): Promise<PrintJob[]> {
+    // Tenta limpar jobs expirados antes de retornar a lista
+    await this.cleanupExpiredPrintJobs(businessId);
+
     if (this.isDemoMode || !isSupabaseConfigured()) {
       const saved = localStorage.getItem(LOCAL_PRINT_JOBS_KEY);
       return saved ? JSON.parse(saved) : [];
@@ -758,6 +790,84 @@ export const supabaseService = {
       }
     }
     return true;
+  },
+
+  async cleanupExpiredPrintJobs(businessId: string): Promise<void> {
+    const now = Date.now();
+    // Executa a limpeza a cada 10 minutos no máximo para evitar excesso de requisições
+    if (now - this.lastCleanupTime < 10 * 60 * 1000) return;
+    this.lastCleanupTime = now;
+
+    const config = this.getPrinterConfig();
+    const hours = config.autoCleanupHours || 0;
+    if (hours <= 0) return;
+
+    const cutoff = new Date();
+    cutoff.setHours(cutoff.getHours() - hours);
+    const cutoffIso = cutoff.toISOString();
+
+    // 1. Limpeza no LocalStorage
+    const localJobsRaw = localStorage.getItem(LOCAL_PRINT_JOBS_KEY);
+    if (localJobsRaw) {
+      try {
+        const localJobs: PrintJob[] = JSON.parse(localJobsRaw);
+        const filteredJobs = localJobs.filter(job => {
+          // Mantém jobs já impressos ou falhados, limpa apenas pendentes antigos
+          if (job.status !== 'pending') return true;
+          return new Date(job.created_at) >= cutoff;
+        });
+        if (filteredJobs.length !== localJobs.length) {
+          localStorage.setItem(LOCAL_PRINT_JOBS_KEY, JSON.stringify(filteredJobs));
+        }
+      } catch (e) {
+        /* ignore */
+      }
+    }
+
+    // 2. Limpeza no Supabase
+    if (!this.isDemoMode && isSupabaseConfigured()) {
+      try {
+        await supabase
+          .from('print_jobs')
+          .delete()
+          .eq('business_id', businessId)
+          .eq('status', 'pending')
+          .lt('created_at', cutoffIso);
+      } catch (err) {
+        console.warn('Erro ao limpar jobs expirados no Supabase:', err);
+      }
+    }
+  },
+
+  async backupRecentOrdersToOffline(businessId: string): Promise<number> {
+    if (this.isDemoMode || !isSupabaseConfigured()) return 0;
+
+    try {
+      // Backup das últimas 24 horas para garantir que o histórico recente esteja offline
+      const yesterday = new Date();
+      yesterday.setHours(yesterday.getHours() - 24);
+      
+      const { data, error } = await supabase
+        .from('orders')
+        .select('*')
+        .eq('business_id', businessId)
+        .gte('created_at', yesterday.toISOString());
+      
+      if (error) throw error;
+      
+      if (data && data.length > 0) {
+        let backedUpCount = 0;
+        for (const order of data) {
+          await saveOrderOffline(order);
+          backedUpCount++;
+        }
+        return backedUpCount;
+      }
+      return 0;
+    } catch (err) {
+      console.warn('Falha ao realizar backup automático para IndexedDB:', err);
+      return 0;
+    }
   },
 
   // ==========================================

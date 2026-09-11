@@ -82,7 +82,8 @@ export const DEFAULT_PRINTER_CONFIG: PrinterConfig = {
   networkPrinterPort: 9100,
   headerCustomText: 'BEM-VINDO AO EVENTO',
   footerCustomText: 'OBRIGADO PELA PREFERÊNCIA!',
-  directPrinting: false
+  directPrinting: false,
+  autoCleanupHours: 0
 };
 
 export const SQL_SCHEMA_SCRIPT = `-- Configuração do Schema do PrintFood no Supabase

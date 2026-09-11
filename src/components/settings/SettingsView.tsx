@@ -3,17 +3,13 @@ import {
   Printer, 
   Users, 
   Store, 
-  Smartphone, 
-  Monitor, 
   Plus, 
   Edit, 
   Trash2, 
   Check, 
   X, 
-  RefreshCw, 
-  Send, 
   Sliders, 
-  Copy, 
+  Copy,
   CheckCircle2, 
   Play,
   FileText,
@@ -28,7 +24,7 @@ import {
   User,
   Database
 } from 'lucide-react';
-import { Business, Attendant, PrinterConfig, PrintJob, AdminUser, Category } from '../../types';
+import { Business, Attendant, PrinterConfig, AdminUser } from '../../types';
 import { supabaseService } from '../../services/supabaseService';
 import { SQL_SCHEMA_SCRIPT, MASTER_ADMIN_CREDENTIALS } from '../../data/initialData';
 import { playBeep } from '../../lib/sound';
@@ -48,48 +44,19 @@ export const SettingsView: React.FC<SettingsViewProps> = ({ business, onBusiness
   const [showAdminPassword, setShowAdminPassword] = useState(false);
   const [copiedPassword, setCopiedPassword] = useState(false);
   const [copiedEmail, setCopiedEmail] = useState(false);
-  const [copiedKiosk, setCopiedKiosk] = useState(false);
-  const kioskCommand = `"C:\\Program Files\\Google\\Chrome\\Application\\chrome.exe" --kiosk-printing`;
-  const handleCopyKiosk = () => {
-    navigator.clipboard.writeText(kioskCommand);
-    setCopiedKiosk(true);
-    setTimeout(() => setCopiedKiosk(false), 3000);
-  };
 
   // Printer config state
   const [printerConfig, setPrinterConfig] = useState<PrinterConfig>(supabaseService.getPrinterConfig());
-  const [categories] = useState<Category[]>(supabaseService.getLocalCategories());
-  const [usbDevices, setUsbDevices] = useState<USBDevice[]>([]);
   const [saveSuccess, setSaveSuccess] = useState(false);
   const [testOrderModalOpen, setTestOrderModalOpen] = useState(false);
-  const [testSuccessMessage, setTestSuccessMessage] = useState<string | null>(null);
 
-  const requestUsbPrinter = async () => {
-    try {
-      const device = await (navigator as any).usb.requestDevice({ filters: [] });
-      setUsbDevices(prev => [...prev, device]);
-    } catch (err) {
-      console.error('Erro ao solicitar dispositivo:', err);
-    }
+  const updatePrinterConfig = (partial: Partial<PrinterConfig>) => {
+    setPrinterConfig(prev => {
+      const next = { ...prev, ...partial };
+      supabaseService.savePrinterConfig(next);
+      return next;
+    });
   };
-
-  const updateCategoryMapping = (categoryId: string, device: USBDevice) => {
-    setPrinterConfig(prev => ({
-      ...prev,
-      categoryMappings: {
-        ...(prev.categoryMappings || {}),
-        [categoryId]: {
-          vendorId: device.vendorId,
-          productId: device.productId,
-          deviceName: device.productName || 'Impressora Desconhecida'
-        }
-      }
-    }));
-  };
-  
-  // Spooler print jobs state
-  const [printJobs, setPrintJobs] = useState<PrintJob[]>([]);
-  const [loadingJobs, setLoadingJobs] = useState(false);
   
   // Attendants state
   const [attendants, setAttendants] = useState<Attendant[]>([]);
@@ -119,6 +86,14 @@ export const SettingsView: React.FC<SettingsViewProps> = ({ business, onBusiness
   const [businessPhone, setBusinessPhone] = useState(business?.phone || '');
   const [copiedSql, setCopiedSql] = useState(false);
 
+  useEffect(() => {
+    if (business) {
+      setBusinessName(business.name || '');
+      setBusinessDoc(business.document || '');
+      setBusinessPhone(business.phone || '');
+    }
+  }, [business]);
+
   // Load data
   const loadAttendants = async () => {
     if (!business) return;
@@ -126,19 +101,9 @@ export const SettingsView: React.FC<SettingsViewProps> = ({ business, onBusiness
     setAttendants(data);
   };
 
-  const loadPrintJobs = async () => {
-    if (!business) return;
-    setLoadingJobs(true);
-    const jobs = await supabaseService.getPrintJobs(business.id);
-    setPrintJobs(jobs);
-    setLoadingJobs(false);
-  };
-
   useEffect(() => {
     loadAttendants();
-    loadPrintJobs();
 
-    const handleJobEvent = () => loadPrintJobs();
     const handleAttendantEvent = () => {
       loadAttendants();
       setActiveAttendant(supabaseService.getActiveAttendant());
@@ -147,74 +112,27 @@ export const SettingsView: React.FC<SettingsViewProps> = ({ business, onBusiness
       setAdminUser(supabaseService.getCurrentAdmin());
     };
 
-    window.addEventListener('printfood:remote-print-job', handleJobEvent);
-    window.addEventListener('printfood:print-job-updated', handleJobEvent);
     window.addEventListener('printfood:attendant-changed', handleAttendantEvent);
     window.addEventListener('printfood:admin-auth-changed', handleAdminAuthEvent);
 
     return () => {
-      window.removeEventListener('printfood:remote-print-job', handleJobEvent);
-      window.removeEventListener('printfood:print-job-updated', handleJobEvent);
       window.removeEventListener('printfood:attendant-changed', handleAttendantEvent);
       window.removeEventListener('printfood:admin-auth-changed', handleAdminAuthEvent);
     };
   }, [business]);
-
-  // Carregar dispositivos USB ja pareados no inicio
-  useEffect(() => {
-    if (navigator.usb) {
-      navigator.usb.getDevices()
-        .then(devices => {
-          setUsbDevices(devices);
-        })
-        .catch(err => {
-          console.error('Erro ao listar dispositivos USB pareados:', err);
-        });
-    }
-  }, []);
 
   // Save printer config
   const handleSavePrinterConfig = () => {
     supabaseService.savePrinterConfig(printerConfig);
     setSaveSuccess(true);
     setTimeout(() => setSaveSuccess(false), 2500);
+    alert('Configurações da impressora salvas com sucesso!');
   };
 
   // Test Print locally
   const handleTestPrint = () => {
     playBeep();
     setTestOrderModalOpen(true);
-  };
-
-  // Simulate remote print from mobile to PC
-  const handleSimulateMobilePrint = async () => {
-    if (!business) return;
-    playBeep();
-    const mockNumber = String(Math.floor(100 + Math.random() * 900));
-    await supabaseService.dispatchRemotePrintJob({
-      business_id: business.id,
-      order_id: 'test-order-' + Date.now(),
-      ticket_number: mockNumber,
-      source_device: 'Celular Garçom ' + (activeAttendant?.name || 'Móvel'),
-      attendant_name: activeAttendant?.name || 'Operador Móvel',
-      customer_name: 'Cliente Teste Móvel',
-      items: [
-        { name: 'Chopp Artesanal 400ml', quantity: 2, unitPrice: 14.00, total: 28.00 },
-        { name: 'Pastel Especial de Carne', quantity: 1, unitPrice: 12.00, total: 12.00 }
-      ],
-      total: 40.00,
-      payment_method: 'pix'
-    });
-    setTestSuccessMessage(`Ficha de teste #${mockNumber} disparada com sucesso para a fila do PC!`);
-    setTimeout(() => setTestSuccessMessage(null), 5000);
-    loadPrintJobs();
-  };
-
-  // Reprint a job
-  const handleReprintJob = (job: PrintJob) => {
-    playBeep();
-    supabaseService.updatePrintJobStatus(job.id, 'printed');
-    window.print();
   };
 
   // Attendant actions
@@ -406,439 +324,188 @@ export const SettingsView: React.FC<SettingsViewProps> = ({ business, onBusiness
         {/* ==================================================== */}
         {activeTab === 'printer' && (
           <div className="space-y-6">
-            
-            {/* 3. MAPEAMENTO DE IMPRESSORAS POR CATEGORIA (WEBUSB) */}
-            <div className="bg-neutral-900 border border-neutral-800 rounded-3xl p-5 sm:p-6 shadow-sm">
-              <h3 className="text-base font-black text-white mb-4">Mapeamento de Impressoras (WebUSB)</h3>
-              
-              <button
-                onClick={requestUsbPrinter}
-                className="mb-4 px-4 py-2 bg-orange-600 text-white rounded-xl text-xs font-bold"
-              >
-                Detectar Nova Impressora USB
-              </button>
-
-              <div className="space-y-3">
-                {categories.map(category => (
-                  <div key={category.id} className="flex items-center justify-between bg-neutral-950 p-3 rounded-xl border border-neutral-800">
-                    <span className="text-sm font-bold text-white">{category.name}</span>
-                    <select
-                      value={printerConfig.categoryMappings?.[category.id]?.productId || ''}
-                      onChange={(e) => {
-                        const device = usbDevices.find(d => d.productId.toString() === e.target.value);
-                        if (device) updateCategoryMapping(category.id, device);
-                      }}
-                      className="bg-neutral-900 text-neutral-300 text-xs p-2 rounded-lg border border-neutral-700"
-                    >
-                      <option value="">Impressora Padrão</option>
-                      {usbDevices.map(d => (
-                        <option key={d.productId} value={d.productId}>{d.productName || 'USB Printer'}</option>
-                      ))}
-                    </select>
-                  </div>
-                ))}
-              </div>
-            </div>
-            <div className="bg-neutral-900 border border-neutral-800 rounded-3xl p-5 sm:p-6 shadow-sm">
-              <div className="mb-4">
+            <div className="bg-neutral-900 border border-neutral-800 rounded-3xl p-5 sm:p-6 shadow-sm space-y-5">
+              <div>
                 <span className="text-xs font-bold text-orange-400 uppercase tracking-wider">
-                  Arquitetura de Operação
+                  Impressora do Sistema / PC
                 </span>
                 <h2 className="text-lg font-black text-white mt-0.5">
-                  Como este aparelho está operando agora?
+                  Impressão no Computador ou Notebook
                 </h2>
-                <p className="text-xs text-neutral-400">
-                  Defina se este aparelho é o computador com a impressora plugada ou um celular móvel de atendimento.
+                <p className="text-xs text-neutral-400 mt-1 leading-relaxed">
+                  O PrintFood utiliza sempre a <strong>impressora padrão instalada e configurada no seu PC ou notebook</strong> (Windows, macOS ou Linux). Ao finalizar uma venda, o sistema envia a ficha diretamente para a impressora do seu sistema operacional.
                 </p>
               </div>
 
-              <div className="grid grid-cols-1 md:grid-cols-3 gap-3.5">
-                
-                {/* MODO PC SPOOLER */}
-                <button
-                  type="button"
-                  onClick={() => setPrinterConfig({ ...printerConfig, targetMode: 'pc_spooler_server' })}
-                  className={`p-4 rounded-2xl border text-left transition relative flex flex-col justify-between ${
-                    printerConfig.targetMode === 'pc_spooler_server'
-                      ? 'bg-orange-950/40 border-orange-500 ring-1 ring-orange-500 shadow-md'
-                      : 'bg-neutral-950 border-neutral-800 hover:border-neutral-700'
-                  }`}
-                >
-                  <div>
-                    <div className="flex items-center justify-between mb-2">
-                      <div className="w-10 h-10 rounded-xl bg-orange-600/20 text-orange-400 flex items-center justify-center font-bold">
-                        <Monitor className="w-5 h-5" />
-                      </div>
-                      {printerConfig.targetMode === 'pc_spooler_server' && (
-                        <span className="px-2 py-0.5 bg-orange-500 text-white rounded-full text-[10px] font-black uppercase">
-                          Ativo Aqui
-                        </span>
-                      )}
-                    </div>
-                    <div className="text-sm font-black text-white mb-1">
-                      Estação Central (PC + Impressora)
-                    </div>
-                    <p className="text-xs text-neutral-400 leading-relaxed">
-                      Atua como <strong>Servidor de Impressão</strong>. Fica escutando e imprimindo automaticamente todas as fichas enviadas pelos celulares.
-                    </p>
-                  </div>
-                  <div className="mt-3 pt-2 border-t border-neutral-800 flex items-center gap-1.5 text-[11px] text-emerald-400 font-semibold">
-                    <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" />
-                    Recebe de múltiplos celulares
-                  </div>
-                </button>
+              <div className="space-y-4">
+                {/* Nome da Estação */}
+                <div>
+                  <label className="text-xs font-bold text-neutral-300 block mb-1">
+                    Nome identificador deste dispositivo:
+                  </label>
+                  <input
+                    type="text"
+                    value={printerConfig.stationName}
+                    onChange={e => updatePrinterConfig({ stationName: e.target.value })}
+                    placeholder="Ex: Caixa 01 PC, Balcão Principal"
+                    className="w-full bg-neutral-950 border border-neutral-800 rounded-xl px-3.5 py-2.5 text-sm text-white focus:border-orange-500 outline-none"
+                  />
+                </div>
 
-                {/* MODO CELULAR MÓVEL */}
-                <button
-                  type="button"
-                  onClick={() => setPrinterConfig({ ...printerConfig, targetMode: 'mobile_send_to_pc' })}
-                  className={`p-4 rounded-2xl border text-left transition relative flex flex-col justify-between ${
-                    printerConfig.targetMode === 'mobile_send_to_pc'
-                      ? 'bg-orange-950/40 border-orange-500 ring-1 ring-orange-500 shadow-md'
-                      : 'bg-neutral-950 border-neutral-800 hover:border-neutral-700'
-                  }`}
-                >
-                  <div>
-                    <div className="flex items-center justify-between mb-2">
-                      <div className="w-10 h-10 rounded-xl bg-blue-600/20 text-blue-400 flex items-center justify-center font-bold">
-                        <Smartphone className="w-5 h-5" />
-                      </div>
-                      {printerConfig.targetMode === 'mobile_send_to_pc' && (
-                        <span className="px-2 py-0.5 bg-orange-500 text-white rounded-full text-[10px] font-black uppercase">
-                          Ativo Aqui
-                        </span>
-                      )}
-                    </div>
-                    <div className="text-sm font-black text-white mb-1">
-                      Terminal Móvel (Celular / Tablet)
-                    </div>
-                    <p className="text-xs text-neutral-400 leading-relaxed">
-                      Usado pelos garçons ou atendentes na fila. Ao confirmar a venda, <strong>envia a ficha via nuvem direto para o PC do caixa</strong> imprimir.
-                    </p>
-                  </div>
-                  <div className="mt-3 pt-2 border-t border-neutral-800 flex items-center gap-1.5 text-[11px] text-blue-400 font-semibold">
-                    <Send className="w-3 h-3" />
-                    Disparo remoto em tempo real
-                  </div>
-                </button>
-
-                {/* MODO IMPRESSÃO LOCAL */}
-                <button
-                  type="button"
-                  onClick={() => setPrinterConfig({ ...printerConfig, targetMode: 'local' })}
-                  className={`p-4 rounded-2xl border text-left transition relative flex flex-col justify-between ${
-                    printerConfig.targetMode === 'local'
-                      ? 'bg-orange-950/40 border-orange-500 ring-1 ring-orange-500 shadow-md'
-                      : 'bg-neutral-950 border-neutral-800 hover:border-neutral-700'
-                  }`}
-                >
-                  <div>
-                    <div className="flex items-center justify-between mb-2">
-                      <div className="w-10 h-10 rounded-xl bg-neutral-800 text-neutral-300 flex items-center justify-center font-bold">
-                        <Printer className="w-5 h-5" />
-                      </div>
-                      {printerConfig.targetMode === 'local' && (
-                        <span className="px-2 py-0.5 bg-orange-500 text-white rounded-full text-[10px] font-black uppercase">
-                          Ativo Aqui
-                        </span>
-                      )}
-                    </div>
-                    <div className="text-sm font-black text-white mb-1">
-                      Impressão Local / Direta
-                    </div>
-                    <p className="text-xs text-neutral-400 leading-relaxed">
-                      Imprime no próprio aparelho através do diálogo de impressão do navegador ou impressora conectada localmente.
-                    </p>
-                  </div>
-                  <div className="mt-3 pt-2 border-t border-neutral-800 flex items-center gap-1.5 text-[11px] text-neutral-400 font-semibold">
-                    <CheckCircle2 className="w-3 h-3" />
-                    Operação autônoma
-                  </div>
-                </button>
-
-              </div>
-            </div>
-
-            {/* 2. DETALHES DE FORMATAÇÃO E HARDWARE DA IMPRESSORA */}
-            <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-              
-              {/* CONFIGURAÇÕES GERAIS DA BOBINA */}
-              <div className="bg-neutral-900 border border-neutral-800 rounded-3xl p-5 sm:p-6 space-y-4 shadow-sm">
-                <h3 className="text-base font-black text-white flex items-center gap-2">
-                  <Printer className="w-5 h-5 text-orange-500" />
-                  <span>Configuração da Impressora & Bobina</span>
-                </h3>
-
-                <div className="space-y-3.5">
-                  {/* Nome da Estação */}
+                {/* Largura da Bobina & Vias */}
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                   <div>
                     <label className="text-xs font-bold text-neutral-300 block mb-1">
-                      Nome identificador deste dispositivo:
-                    </label>
-                    <input
-                      type="text"
-                      value={printerConfig.stationName}
-                      onChange={e => setPrinterConfig({ ...printerConfig, stationName: e.target.value })}
-                      placeholder="Ex: Caixa 01 PC, Celular Maria, Terminal Quermesse"
-                      className="w-full bg-neutral-950 border border-neutral-800 rounded-xl px-3.5 py-2.5 text-sm text-white focus:border-orange-500 outline-none"
-                    />
-                  </div>
-
-                  {/* Largura da Bobina */}
-                  <div className="grid grid-cols-2 gap-3">
-                    <div>
-                      <label className="text-xs font-bold text-neutral-300 block mb-1">
-                        Largura do Papel:
-                      </label>
-                      <select
-                        value={printerConfig.paperWidth}
-                        onChange={e => setPrinterConfig({ ...printerConfig, paperWidth: e.target.value as any })}
-                        className="w-full bg-neutral-950 border border-neutral-800 rounded-xl px-3 py-2.5 text-sm text-white focus:border-orange-500 outline-none font-medium"
-                      >
-                        <option value="80mm">80mm (Padrão Térmica)</option>
-                        <option value="58mm">58mm (Bobina Estreita)</option>
-                        <option value="a4">A4 (Impressora Comum / Escritório)</option>
-                      </select>
-                    </div>
-
-                    <div>
-                      <label className="text-xs font-bold text-neutral-300 block mb-1">
-                        Número de Vias:
-                      </label>
-                      <select
-                        value={printerConfig.printCopies}
-                        onChange={e => setPrinterConfig({ ...printerConfig, printCopies: Number(e.target.value) })}
-                        className="w-full bg-neutral-950 border border-neutral-800 rounded-xl px-3 py-2.5 text-sm text-white focus:border-orange-500 outline-none font-medium"
-                      >
-                        <option value={1}>1 Via (Ficha Cliente)</option>
-                        <option value={2}>2 Vias (Cliente + Cozinha)</option>
-                      </select>
-                    </div>
-                  </div>
-
-                  {/* Tipo de Impressora */}
-                  <div>
-                    <label className="text-xs font-bold text-neutral-300 block mb-1">
-                      Método de Impressão:
+                      Largura do Papel / Ficha:
                     </label>
                     <select
-                      value={printerConfig.printerType}
-                      onChange={e => setPrinterConfig({ ...printerConfig, printerType: e.target.value as any })}
-                      className="w-full bg-neutral-950 border border-neutral-800 rounded-xl px-3 py-2.5 text-sm text-white focus:border-orange-500 outline-none font-medium"
+                      value={printerConfig.paperWidth}
+                      onChange={e => updatePrinterConfig({ paperWidth: e.target.value as any })}
+                      className="w-full bg-neutral-950 border border-neutral-800 rounded-xl px-3.5 py-2.5 text-sm text-white focus:border-orange-500 outline-none font-medium"
                     >
-                      <option value="browser">Impressora Padrão do Sistema / Navegador (Recomendado)</option>
-                      <option value="network">Impressora de Rede / Ethernet (Raw TCP / 9100)</option>
-                      <option value="bluetooth">Bluetooth ESC/POS (Portátil)</option>
-                      <option value="escpos_usb">USB (WebUSB Directo)</option>
+                      <option value="80mm">80mm (Padrão Térmica)</option>
+                      <option value="58mm">58mm (Bobina Estreita)</option>
+                      <option value="a4">A4 (Impressora Comum / Escritório)</option>
                     </select>
                   </div>
 
-                  {/* USB / Default Printer Selection Details */}
-                  {printerConfig.printerType === 'escpos_usb' ? (
-                    <div className="bg-neutral-950 p-4 rounded-xl border border-neutral-800 space-y-4">
-                      <div>
-                        <span className="text-[11px] font-bold text-neutral-400 block mb-1.5 uppercase">
-                          Seletor de Impressora Padrão (USB):
-                        </span>
-                        
-                        <div className="flex gap-2 mb-3">
-                          <select
-                            value={printerConfig.usbPrinterVendorId && printerConfig.usbPrinterProductId ? `${printerConfig.usbPrinterVendorId}:${printerConfig.usbPrinterProductId}` : ''}
-                            onChange={(e) => {
-                              if (!e.target.value) {
-                                setPrinterConfig({ ...printerConfig, usbPrinterVendorId: undefined, usbPrinterProductId: undefined });
-                                return;
-                              }
-                              const [vId, pId] = e.target.value.split(':').map(Number);
-                              setPrinterConfig({ ...printerConfig, usbPrinterVendorId: vId, usbPrinterProductId: pId });
-                            }}
-                            className="flex-1 bg-neutral-900 text-neutral-300 text-xs p-2.5 rounded-lg border border-neutral-700 outline-none focus:border-orange-500 font-semibold"
-                          >
-                            <option value="">-- Nenhuma Impressora Selecionada --</option>
-                            {usbDevices.map((d, index) => (
-                              <option key={`${d.vendorId}:${d.productId}:${index}`} value={`${d.vendorId}:${d.productId}`}>
-                                {d.productName || `Dispositivo USB (${d.vendorId}:${d.productId})`}
-                              </option>
-                            ))}
-                          </select>
-                          
-                          <button
-                            type="button"
-                            onClick={async () => {
-                              try {
-                                const device = await navigator.usb.requestDevice({ filters: [] });
-                                setUsbDevices(prev => {
-                                  if (prev.some(d => d.vendorId === device.vendorId && d.productId === device.productId)) {
-                                    return prev;
-                                  }
-                                  return [...prev, device];
-                                });
-                                setPrinterConfig({
-                                  ...printerConfig,
-                                  usbPrinterVendorId: device.vendorId,
-                                  usbPrinterProductId: device.productId
-                                });
-                              } catch (err) {
-                                console.error('Erro ao emparelhar dispositivo USB:', err);
-                              }
-                            }}
-                            className="px-3.5 bg-orange-600 hover:bg-orange-500 text-white rounded-lg text-xs font-black transition whitespace-nowrap"
-                          >
-                            Detectar Nova
-                          </button>
-                        </div>
-                        
-                        <p className="text-[10px] text-neutral-500 leading-normal">
-                          Dispositivos pareados anteriormente via WebUSB no seu navegador são carregados automaticamente aqui. Selecione o dispositivo de preferência para acionar a impressão térmica instantânea.
-                        </p>
-                      </div>
-                    </div>
-                  ) : printerConfig.printerType === 'browser' ? (
-                    <div className="bg-neutral-950 p-4 rounded-xl border border-neutral-800 space-y-2">
-                      <div className="text-[11px] font-bold text-neutral-400 block uppercase">
-                        Configuração de Impressora do Sistema:
-                      </div>
-                      <p className="text-xs text-neutral-400 leading-relaxed">
-                        Por segurança, o navegador não expõe a lista de impressoras físicas instaladas no seu sistema operacional diretamente ao JavaScript. 
-                      </p>
-                      <p className="text-xs text-neutral-400 leading-relaxed">
-                        Para automatizar, o sistema usa o assistente nativo. Você pode definir a sua <strong>impressora preferida como padrão diretamente nas configurações do seu sistema operacional</strong> (Windows/macOS/Linux) para uso automático.
-                      </p>
-                      <div className="bg-orange-950/20 border border-orange-900/50 p-3 rounded-lg text-[11px] text-orange-300 leading-normal">
-                        <strong>Dica de Automatização:</strong> Ative a opção <strong>"Impressão Direta Automática"</strong> abaixo e configure o atalho do Chrome com o comando <code className="bg-neutral-950 text-white px-1 py-0.5 rounded">--kiosk-printing</code> para imprimir sem a janela de diálogo aparecer!
-                      </div>
-                    </div>
-                  ) : null}
-
-                  {/* Rede IP se selecionado */}
-                  {printerConfig.printerType === 'network' && (
-                    <div className="grid grid-cols-3 gap-2 bg-neutral-950 p-3 rounded-xl border border-neutral-800">
-                      <div className="col-span-2">
-                        <label className="text-[11px] font-bold text-neutral-400 block mb-1">IP da Impressora:</label>
-                        <input
-                          type="text"
-                          value={printerConfig.networkPrinterIp || ''}
-                          onChange={e => setPrinterConfig({ ...printerConfig, networkPrinterIp: e.target.value })}
-                          placeholder="192.168.1.200"
-                          className="w-full bg-neutral-900 border border-neutral-800 rounded-lg px-2.5 py-1.5 text-xs text-white outline-none"
-                        />
-                      </div>
-                      <div>
-                        <label className="text-[11px] font-bold text-neutral-400 block mb-1">Porta:</label>
-                        <input
-                          type="number"
-                          value={printerConfig.networkPrinterPort || 9100}
-                          onChange={e => setPrinterConfig({ ...printerConfig, networkPrinterPort: Number(e.target.value) })}
-                          placeholder="9100"
-                          className="w-full bg-neutral-900 border border-neutral-800 rounded-lg px-2.5 py-1.5 text-xs text-white outline-none"
-                        />
-                      </div>
-                    </div>
-                  )}
-
-                  {/* Vias separadas por item */}
-                  <div className="pt-2 border-t border-neutral-800/80 space-y-2.5">
-                    <label className="flex items-center gap-3 cursor-pointer select-none">
-                      <input
-                        type="checkbox"
-                        checked={printerConfig.directPrinting}
-                        onChange={e => setPrinterConfig({ ...printerConfig, directPrinting: e.target.checked })}
-                        className="w-4 h-4 accent-orange-500 rounded"
-                      />
-                      <div className="text-xs">
-                        <span className="font-bold text-white block">Impressão Direta Automática (Modo Kiosk)</span>
-                        <span className="text-neutral-400">
-                          Se ativado, pula a janela de diálogo (requer navegador com --kiosk-printing).
-                        </span>
-                      </div>
+                  <div>
+                    <label className="text-xs font-bold text-neutral-300 block mb-1">
+                      Número de Vias por Ficha:
                     </label>
-
-                    <label className="flex items-center gap-3 cursor-pointer select-none">
-                      <input
-                        type="checkbox"
-                        checked={printerConfig.useCompactTemplate}
-                        onChange={e => setPrinterConfig({ ...printerConfig, useCompactTemplate: e.target.checked })}
-                        className="w-4 h-4 accent-orange-500 rounded"
-                      />
-                      <div className="text-xs">
-                        <span className="font-bold text-white block">Template de Ficha Compacta</span>
-                        <span className="text-neutral-400">
-                          Remove cabeçalhos extensos e reduz o espaçamento para economizar papel.
-                        </span>
-                      </div>
-                    </label>
-
-                    <label className="flex items-center gap-3 cursor-pointer select-none">
-                      <input
-                        type="checkbox"
-                        checked={printerConfig.separateVouchersByItem}
-                        onChange={e => setPrinterConfig({ ...printerConfig, separateVouchersByItem: e.target.checked })}
-                        className="w-4 h-4 accent-orange-500 rounded"
-                      />
-                      <div className="text-xs">
-                        <span className="font-bold text-white block">Imprimir Fichas Individuais por Item</span>
-                        <span className="text-neutral-400">
-                          Gera 1 ficha para cada lanche ou bebida (ideal para eventos com barracas separadas).
-                        </span>
-                      </div>
-                    </label>
-
-                    <label className="flex items-center gap-3 cursor-pointer select-none">
-                      <input
-                        type="checkbox"
-                        checked={printerConfig.autoPrintOnOrder}
-                        onChange={e => setPrinterConfig({ ...printerConfig, autoPrintOnOrder: e.target.checked })}
-                        className="w-4 h-4 accent-orange-500 rounded"
-                      />
-                      <div className="text-xs">
-                        <span className="font-bold text-white block">Impressão Automática ao Concluir Venda</span>
-                        <span className="text-neutral-400">
-                          Abre o diálogo de impressão imediatamente assim que o pagamento for registrado.
-                        </span>
-                      </div>
-                    </label>
+                    <select
+                      value={printerConfig.printCopies}
+                      onChange={e => updatePrinterConfig({ printCopies: Number(e.target.value) })}
+                      className="w-full bg-neutral-950 border border-neutral-800 rounded-xl px-3.5 py-2.5 text-sm text-white focus:border-orange-500 outline-none font-medium"
+                    >
+                      <option value={1}>1 Via (Ficha Principal)</option>
+                      <option value={2}>2 Vias (Cliente + Cozinha/Controle)</option>
+                    </select>
                   </div>
-
-                  {/* Header e Footer Customizados */}
-                  <div className="pt-2 border-t border-neutral-800/80 space-y-2">
-                    <div>
-                      <label className="text-[11px] font-bold text-neutral-400 block mb-1">
-                        Cabeçalho Personalizado da Ficha:
-                      </label>
-                      <input
-                        type="text"
-                        value={printerConfig.headerCustomText || ''}
-                        onChange={e => setPrinterConfig({ ...printerConfig, headerCustomText: e.target.value })}
-                        placeholder="Ex: FESTA DA COMUNIDADE - CAIXA CENTRAL"
-                        className="w-full bg-neutral-950 border border-neutral-800 rounded-xl px-3 py-2 text-xs text-white outline-none"
-                      />
-                    </div>
-
-                    <div>
-                      <label className="text-[11px] font-bold text-neutral-400 block mb-1">
-                        Rodapé / Mensagem do Balcão:
-                      </label>
-                      <input
-                        type="text"
-                        value={printerConfig.footerCustomText || ''}
-                        onChange={e => setPrinterConfig({ ...printerConfig, footerCustomText: e.target.value })}
-                        placeholder="Ex: GUARDE ESTA FICHA E RETIRE NO BALCÃO"
-                        className="w-full bg-neutral-950 border border-neutral-800 rounded-xl px-3 py-2 text-xs text-white outline-none"
-                      />
-                    </div>
-                  </div>
-
                 </div>
 
-                {/* BOTÕES DE SALVAR E TESTAR */}
-                <div className="pt-3 flex flex-wrap gap-2.5">
+                {/* Opções em Checkboxes */}
+                <div className="pt-2 border-t border-neutral-800 space-y-3">
+                  <label className="flex items-center gap-3 cursor-pointer select-none">
+                    <input
+                      type="checkbox"
+                      checked={printerConfig.directPrinting}
+                      onChange={e => updatePrinterConfig({ directPrinting: e.target.checked })}
+                      className="w-4 h-4 accent-orange-500 rounded"
+                    />
+                    <div className="text-xs">
+                      <span className="font-bold text-white block">Impressão Direta Automática (Modo Kiosk)</span>
+                      <span className="text-neutral-400">
+                        Pula a janela de diálogo do navegador (requer atalho Chrome com <code className="text-orange-400 font-mono">--kiosk-printing</code>).
+                      </span>
+                    </div>
+                  </label>
+
+                  <label className="flex items-center gap-3 cursor-pointer select-none">
+                    <input
+                      type="checkbox"
+                      checked={printerConfig.useCompactTemplate}
+                      onChange={e => updatePrinterConfig({ useCompactTemplate: e.target.checked })}
+                      className="w-4 h-4 accent-orange-500 rounded"
+                    />
+                    <div className="text-xs">
+                      <span className="font-bold text-white block">Template de Ficha Compacta</span>
+                      <span className="text-neutral-400">
+                        Ocupa somente o espaço necessário para a ficha, sem sobras em cima ou embaixo.
+                      </span>
+                    </div>
+                  </label>
+
+                  <label className="flex items-center gap-3 cursor-pointer select-none">
+                    <input
+                      type="checkbox"
+                      checked={printerConfig.separateVouchersByItem}
+                      onChange={e => updatePrinterConfig({ separateVouchersByItem: e.target.checked })}
+                      className="w-4 h-4 accent-orange-500 rounded"
+                    />
+                    <div className="text-xs">
+                      <span className="font-bold text-white block">Imprimir Fichas Individuais por Item</span>
+                      <span className="text-neutral-400">
+                        Gera 1 ficha para cada item do pedido (ideal para barracas separadas).
+                      </span>
+                    </div>
+                  </label>
+
+                  <label className="flex items-center gap-3 cursor-pointer select-none">
+                    <input
+                      type="checkbox"
+                      checked={printerConfig.autoPrintOnOrder}
+                      onChange={e => updatePrinterConfig({ autoPrintOnOrder: e.target.checked })}
+                      className="w-4 h-4 accent-orange-500 rounded"
+                    />
+                    <div className="text-xs">
+                      <span className="font-bold text-white block">Impressão Automática ao Concluir Venda</span>
+                      <span className="text-neutral-400">
+                        Aciona a impressão imediatamente assim que o pagamento for confirmado.
+                      </span>
+                    </div>
+                  </label>
+
+                  <div className="pt-2 flex items-center gap-3">
+                    <div className="flex-1">
+                      <label className="text-xs font-bold text-white block">Limpar fila de impressão automaticamente (horas):</label>
+                      <p className="text-[10px] text-neutral-400">Remove jobs pendentes antigos para evitar acúmulo (0 = desativado).</p>
+                    </div>
+                    <select
+                      value={printerConfig.autoCleanupHours || 0}
+                      onChange={e => updatePrinterConfig({ autoCleanupHours: Number(e.target.value) })}
+                      className="w-32 bg-neutral-950 border border-neutral-800 rounded-xl px-3 py-2 text-sm text-white focus:border-orange-500 outline-none font-medium"
+                    >
+                      <option value={0}>Desativado</option>
+                      <option value={1}>1 hora</option>
+                      <option value={3}>3 horas</option>
+                      <option value={6}>6 horas</option>
+                      <option value={12}>12 horas</option>
+                      <option value={24}>24 horas</option>
+                      <option value={48}>48 horas</option>
+                      <option value={72}>72 horas</option>
+                    </select>
+                  </div>
+                </div>
+
+                {/* Cabeçalho e Rodapé */}
+                <div className="pt-2 border-t border-neutral-800 space-y-3">
+                  <div>
+                    <label className="text-[11px] font-bold text-neutral-400 block mb-1">
+                      Cabeçalho Personalizado da Ficha:
+                    </label>
+                    <input
+                      type="text"
+                      value={printerConfig.headerCustomText || ''}
+                      onChange={e => updatePrinterConfig({ headerCustomText: e.target.value })}
+                      placeholder="Ex: FESTA BENEFICENTE - CAIXA 01"
+                      className="w-full bg-neutral-950 border border-neutral-800 rounded-xl px-3.5 py-2 text-xs text-white outline-none"
+                    />
+                  </div>
+
+                  <div>
+                    <label className="text-[11px] font-bold text-neutral-400 block mb-1">
+                      Rodapé / Mensagem da Ficha:
+                    </label>
+                    <input
+                      type="text"
+                      value={printerConfig.footerCustomText || ''}
+                      onChange={e => updatePrinterConfig({ footerCustomText: e.target.value })}
+                      placeholder="Ex: OBRIGADO PELA SUA PREFERÊNCIA!"
+                      className="w-full bg-neutral-950 border border-neutral-800 rounded-xl px-3.5 py-2 text-xs text-white outline-none"
+                    />
+                  </div>
+                </div>
+
+                {/* Botões Salvar e Testar */}
+                <div className="pt-3 flex flex-wrap gap-3">
                   <button
                     type="button"
                     onClick={handleSavePrinterConfig}
                     className="flex-1 py-3 px-4 bg-orange-600 hover:bg-orange-500 text-white rounded-xl font-black text-sm flex items-center justify-center gap-2 transition shadow-md"
                   >
                     {saveSuccess ? <Check className="w-4 h-4" /> : <Printer className="w-4 h-4" />}
-                    <span>{saveSuccess ? 'Configuração Salva!' : 'Salvar Configurações'}</span>
+                    <span>{saveSuccess ? 'Configuração Salva com Sucesso!' : 'Salvar Configurações'}</span>
                   </button>
 
                   <button
@@ -850,174 +517,8 @@ export const SettingsView: React.FC<SettingsViewProps> = ({ business, onBusiness
                     <span>Testar Impressão</span>
                   </button>
                 </div>
-
               </div>
-
-              {/* KIOSK PRINTING --kiosk-printing GUIDE */}
-              <div className="bg-neutral-900 border border-neutral-800 rounded-3xl p-5 sm:p-6 shadow-sm space-y-3">
-                <div className="flex items-center justify-between">
-                  <div>
-                    <span className="text-xs font-bold text-orange-400 uppercase tracking-wider">Impressão Direta sem Diálogo (Modo Kiosk)</span>
-                    <h3 className="text-base font-black text-white mt-0.5">Como imprimir direto na impressora térmica sem abrir a janela de diálogo</h3>
-                    <p className="text-xs text-neutral-400 mt-1">
-                      Para que o navegador imprima instantaneamente (sem precisar clicar em "Imprimir" toda vez, resolvendo o problema de janelas que abrem mas não imprimem), crie um atalho do Google Chrome no seu PC com o argumento <code className="text-orange-400 font-mono">--kiosk-printing</code>, exatamente como no Guarafood.
-                    </p>
-                  </div>
-                </div>
-
-                <div className="bg-neutral-950 p-3.5 rounded-2xl border border-neutral-800 flex flex-col sm:flex-row items-center justify-between gap-3">
-                  <code className="text-xs font-mono text-emerald-400 break-all select-all flex-1">
-                    {kioskCommand}
-                  </code>
-                  <button
-                    type="button"
-                    onClick={handleCopyKiosk}
-                    className="py-2 px-4 bg-orange-600 hover:bg-orange-500 text-white rounded-xl text-xs font-black transition shrink-0 flex items-center gap-1.5"
-                  >
-                    {copiedKiosk ? <Check className="w-3.5 h-3.5" /> : <Copy className="w-3.5 h-3.5" />}
-                    <span>{copiedKiosk ? 'Copiado!' : 'Copiar Atalho'}</span>
-                  </button>
-                </div>
-
-                <div className="text-[11px] text-neutral-400 space-y-1">
-                  <p><strong>Como usar no Windows:</strong></p>
-                  <ol className="list-decimal list-inside space-y-0.5 text-neutral-400">
-                    <li>Clique no botão acima para copiar o comando com <code className="text-neutral-200">--kiosk-printing</code>.</li>
-                    <li>Na Área de Trabalho do Windows, clique com o botão direito &gt; <strong>Novo &gt; Atalho</strong>.</li>
-                    <li>Cole o texto copiado, clique em Avançar, dê um nome (ex: <em>PrintFood Kiosk</em>) e Concluir.</li>
-                    <li>Abra o PrintFood sempre por esse atalho. As impressões sairão direto na sua impressora térmica padrão sem abrir caixas de diálogo!</li>
-                  </ol>
-                </div>
-              </div>
-
-              {/* PAINEL DO SERVIDOR DE IMPRESSÃO (SPOOLER DE FICHAS REMOTAS) */}
-              <div className="bg-neutral-900 border border-neutral-800 rounded-3xl p-5 sm:p-6 flex flex-col shadow-sm">
-                <div className="flex items-center justify-between pb-3 border-b border-neutral-800">
-                  <div>
-                    <h3 className="text-base font-black text-white flex items-center gap-2">
-                      <Monitor className="w-5 h-5 text-orange-500" />
-                      <span>Fila de Impressão Remota (Spooler)</span>
-                    </h3>
-                    <p className="text-xs text-neutral-400">
-                      Fichas enviadas dos celulares para este PC imprimir.
-                    </p>
-                  </div>
-
-                  <div className="flex items-center gap-2">
-                    <span className="flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[11px] font-bold bg-emerald-950 text-emerald-400 border border-emerald-800/50">
-                      <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" />
-                      Pronto
-                    </span>
-                    <button
-                      onClick={loadPrintJobs}
-                      title="Atualizar fila"
-                      className="p-1.5 rounded-lg bg-neutral-800 hover:bg-neutral-700 text-neutral-300"
-                    >
-                      <RefreshCw className={`w-3.5 h-3.5 ${loadingJobs ? 'animate-spin' : ''}`} />
-                    </button>
-                  </div>
-                </div>
-
-                {/* TESTE DE DISPARO REMOTO */}
-                <div className="my-3.5 space-y-2">
-                  <div className="p-3.5 rounded-2xl bg-neutral-950 border border-neutral-800 flex items-center justify-between gap-3">
-                    <div className="text-xs">
-                      <div className="font-bold text-white">Testar Envio Celular → PC</div>
-                      <div className="text-neutral-400 text-[11px]">Dispara uma ficha simulada de celular para a fila do PC.</div>
-                    </div>
-                    <button
-                      type="button"
-                      onClick={handleSimulateMobilePrint}
-                      className="py-2 px-3 bg-blue-600 hover:bg-blue-500 text-white rounded-xl text-xs font-bold flex items-center gap-1.5 transition shadow"
-                    >
-                      <Send className="w-3.5 h-3.5" />
-                      <span>Disparar Ficha Teste</span>
-                    </button>
-                  </div>
-
-                  {testSuccessMessage && (
-                    <div className="p-3 bg-emerald-950/70 border border-emerald-800/80 text-emerald-300 rounded-2xl text-xs font-medium flex items-center gap-2 animate-in fade-in">
-                      <CheckCircle2 className="w-4 h-4 text-emerald-400 shrink-0" />
-                      <span>{testSuccessMessage}</span>
-                    </div>
-                  )}
-                </div>
-
-                {/* LISTA DE JOBS / FICHAS */}
-                <div className="flex-1 overflow-y-auto space-y-2 max-h-[300px] pr-1">
-                  {printJobs.length === 0 ? (
-                    <div className="h-40 flex flex-col items-center justify-center text-center p-4 border border-dashed border-neutral-800 rounded-2xl">
-                      <Smartphone className="w-8 h-8 text-neutral-600 mb-2" />
-                      <span className="text-xs font-bold text-neutral-400">Nenhuma ficha na fila no momento</span>
-                      <span className="text-[11px] text-neutral-500 max-w-xs mt-0.5">
-                        Quando um garçom ou atendente confirmar venda pelo celular, ela aparecerá aqui automaticamente.
-                      </span>
-                    </div>
-                  ) : (
-                    printJobs.map(job => (
-                      <div
-                        key={job.id}
-                        className="p-3 bg-neutral-950 border border-neutral-800/90 rounded-2xl flex items-center justify-between gap-2 text-xs"
-                      >
-                        <div className="space-y-0.5">
-                          <div className="flex items-center gap-2">
-                            <span className="font-mono font-black text-sm text-orange-400">
-                              #{job.ticket_number}
-                            </span>
-                            <span className="text-white font-bold">{job.source_device}</span>
-                            <span className={`px-1.5 py-0.5 rounded text-[10px] font-bold uppercase ${
-                              job.status === 'printed' ? 'bg-emerald-950 text-emerald-400' : 'bg-amber-950 text-amber-400'
-                            }`}>
-                              {job.status === 'printed' ? 'Impresso' : 'Aguardando'}
-                            </span>
-                          </div>
-
-                          <div className="text-[11px] text-neutral-400 flex items-center gap-2">
-                            <span>{new Date(job.created_at).toLocaleTimeString('pt-BR')}</span>
-                            <span>•</span>
-                            <span>{job.items.map(i => `${i.quantity}x ${i.name}`).join(', ')}</span>
-                          </div>
-                        </div>
-
-                        <div className="flex items-center gap-2 shrink-0">
-                          <span className="font-bold text-white">
-                            R$ {job.total.toFixed(2).replace('.', ',')}
-                          </span>
-                          <button
-                            type="button"
-                            onClick={() => handleReprintJob(job)}
-                            className="p-2 bg-neutral-800 hover:bg-neutral-700 text-neutral-200 rounded-xl transition"
-                            title="Reimprimir ficha"
-                          >
-                            <Printer className="w-3.5 h-3.5" />
-                          </button>
-                        </div>
-                      </div>
-                    ))
-                  )}
-                </div>
-
-                {printJobs.length > 0 && (
-                  <div className="mt-3 pt-2 border-t border-neutral-800 flex justify-end">
-                    <button
-                      type="button"
-                      onClick={async () => {
-                        if (business) {
-                          await supabaseService.clearPrintJobs(business.id);
-                          loadPrintJobs();
-                        }
-                      }}
-                      className="text-[11px] text-neutral-500 hover:text-red-400 font-semibold transition"
-                    >
-                      Limpar histórico de impressões
-                    </button>
-                  </div>
-                )}
-
-              </div>
-
             </div>
-
           </div>
         )}
 
@@ -1462,7 +963,7 @@ export const SettingsView: React.FC<SettingsViewProps> = ({ business, onBusiness
               <div className="flex justify-end pt-2">
                 <button
                   type="button"
-                  onClick={() => {
+                  onClick={async () => {
                     if (business && onBusinessUpdate) {
                       const updated = {
                         ...business,
@@ -1470,6 +971,7 @@ export const SettingsView: React.FC<SettingsViewProps> = ({ business, onBusiness
                         document: businessDoc,
                         phone: businessPhone
                       };
+                      await supabaseService.updateBusiness(updated);
                       onBusinessUpdate(updated);
                       alert('Dados do estabelecimento atualizados com sucesso!');
                     }
