@@ -4,6 +4,7 @@ import { Printer, X, ArrowRight, Send } from 'lucide-react';
 import { Order, Business, PrinterConfig } from '../../types';
 import { supabaseService } from '../../services/supabaseService';
 import { connectWebUsbPrinter, printViaWebUsb } from '../../lib/webUsbPrinter';
+import { printHtmlViaIframe } from '../../lib/iframePrinter';
 
 interface TicketPrintModalProps {
   isOpen: boolean;
@@ -69,7 +70,12 @@ export const TicketPrintModal: React.FC<TicketPrintModalProps> = ({
       }
     } else {
       setPrintSuccessMsg(config.directPrinting ? 'Enviando para impressora...' : 'Janela de impressão aberta!');
-      window.print();
+      const printElement = document.getElementById('printfood-printable-ticket');
+      if (printElement) {
+        printHtmlViaIframe(printElement.innerHTML);
+      } else {
+        window.print();
+      }
     }
     setTimeout(() => setPrintSuccessMsg(null), 4000);
   };

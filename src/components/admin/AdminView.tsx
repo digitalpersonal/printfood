@@ -4,6 +4,7 @@ import { supabaseService } from '../../services/supabaseService';
 import { Business, Order, PrintJob } from '../../types';
 import { DollarSign, ShoppingBag, TrendingUp, UtensilsCrossed, ArrowRight, Printer, Filter, RefreshCw, Trash2 } from 'lucide-react';
 import { OrderHistory } from './OrderHistory';
+import { printHtmlViaIframe } from '../../lib/iframePrinter';
 
 interface AdminViewProps {
   business: Business | null;
@@ -109,8 +110,14 @@ export const AdminView: React.FC<AdminViewProps> = ({ business, onNavigateToProd
   };
 
   const handlePrintClosure = () => {
-    window.print();
-    setPrintSuccessMsg('Janela de impressão de fechamento aberta com sucesso!');
+    const closureElement = document.getElementById('printfood-closure-printable');
+    if (closureElement) {
+      printHtmlViaIframe(closureElement.outerHTML);
+      setPrintSuccessMsg('Filtro de fechamento enviado para impressão silenciosa!');
+    } else {
+      window.print();
+      setPrintSuccessMsg('Janela de impressão de fechamento aberta com sucesso!');
+    }
     setTimeout(() => setPrintSuccessMsg(null), 4000);
   };
 
