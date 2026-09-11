@@ -74,16 +74,6 @@ export const TicketPrintModal: React.FC<TicketPrintModalProps> = ({
     setTimeout(() => setPrintSuccessMsg(null), 4000);
   };
 
-  // Auto-print if enabled and not remote-only
-  useEffect(() => {
-    if (isOpen && config.autoPrintOnOrder && !isMobileSendToPc && order) {
-      const timer = setTimeout(() => {
-        handlePrint();
-      }, 400);
-      return () => clearTimeout(timer);
-    }
-  }, [isOpen, order?.id, config.autoPrintOnOrder, isMobileSendToPc]);
-
   if (!isOpen || !order) return null;
 
   const formatMoney = (val: number) => `R$ ${val.toFixed(2).replace('.', ',')}`;
