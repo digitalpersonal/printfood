@@ -138,27 +138,6 @@ export const POSView: React.FC<POSViewProps> = ({ business, categories, products
 
     const order = await supabaseService.createOrder(orderData, items);
     if (order) {
-      // Se estiver configurado para enviar do celular para o PC
-      if (printerConfig.targetMode === 'mobile_send_to_pc') {
-        await supabaseService.dispatchRemotePrintJob({
-          business_id: business.id,
-          order_id: order.id,
-          ticket_number: order.ticket_number,
-          source_device: printerConfig.stationName || 'Celular ' + (activeAttendant?.name || 'Móvel'),
-          attendant_name: activeAttendant?.name || 'Operador Móvel',
-          customer_name: order.customer_name || undefined,
-          items: items.map(item => ({
-            name: item.product_name,
-            categoryName: item.category_name,
-            quantity: item.quantity,
-            unitPrice: item.unit_price,
-            total: item.total
-          })),
-          total: order.total,
-          payment_method: order.payment_method
-        });
-      }
-
       setCompletedOrder(order);
       const newItems = items.map(item => ({
         name: item.product_name,

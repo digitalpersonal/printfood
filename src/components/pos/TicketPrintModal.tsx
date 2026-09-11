@@ -147,31 +147,31 @@ export const TicketPrintModal: React.FC<TicketPrintModalProps> = ({
         {specificItem ? (
           <div className="border-b-2 border-dashed border-black pb-3 mb-3 text-center">
             {specificItem.categoryName && (
-              <div className="category-header text-[13px] font-black border-b-2 border-black mb-1 bg-neutral-100 py-0.5">
+              <div className="category-header text-sm font-black border-b-2 border-black mb-1.5 bg-neutral-200 py-1">
                 {specificItem.categoryName}
               </div>
             )}
-            <div className="text-2xl font-black text-black leading-tight">
+            <div className="text-4xl font-black text-black leading-tight">
               {specificItem.quantity}x {specificItem.name}
             </div>
-            <div className="text-xs font-black text-black mt-1">
+            <div className="text-xl font-black text-black mt-2">
               Valor: {formatMoney(specificItem.total)}
             </div>
           </div>
         ) : (
           <div className="border-b-2 border-dashed border-black pb-3 mb-3 space-y-4">
             {Object.entries(groupedItems).map(([cat, catItems]) => (
-              <div key={cat} className="space-y-1.5">
-                <div className="category-header text-[13px] font-black border-b-2 border-black mb-1 bg-neutral-100 py-0.5 px-1 flex justify-between items-center">
+              <div key={cat} className="space-y-2">
+                <div className="category-header text-sm font-black border-b-2 border-black mb-1.5 bg-neutral-200 py-1 px-1.5 flex justify-between items-center">
                   <span>{cat}</span>
-                  <span className="text-[9px] font-normal opacity-70 italic no-print">Seção</span>
+                  <span className="text-[10px] font-normal opacity-70 italic no-print">Seção</span>
                 </div>
                 {catItems.map((item, idx) => (
-                  <div key={idx} className="flex justify-between items-start text-base font-black item-row">
+                  <div key={idx} className="flex justify-between items-start text-xl font-black item-row py-1">
                     <span className="pr-2 leading-tight">
-                      <span className="font-black text-lg mr-1">{item.quantity}x</span>{item.name}
+                      <span className="font-black text-3xl mr-2">{item.quantity}x</span>{item.name}
                     </span>
-                    <span className="shrink-0">{formatMoney(item.total)}</span>
+                    <span className="shrink-0 text-xl">{formatMoney(item.total)}</span>
                   </div>
                 ))}
               </div>
@@ -180,10 +180,10 @@ export const TicketPrintModal: React.FC<TicketPrintModalProps> = ({
         )}
 
         {/* TOTAL & FORMA DE PAGAMENTO */}
-        <div className="border-b-2 border-dashed border-black pb-2 mb-2">
-          <div className="flex justify-between items-center text-sm font-black text-black">
+        <div className="border-b-2 border-dashed border-black pb-2.5 mb-2.5">
+          <div className="flex justify-between items-center text-base font-black text-black">
             <span>TOTAL:</span>
-            <span className="text-lg">{formatMoney(order.total)}</span>
+            <span className="text-xl">{formatMoney(order.total)}</span>
           </div>
         </div>
 

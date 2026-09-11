@@ -345,7 +345,7 @@ export const SettingsView: React.FC<SettingsViewProps> = ({ business, onBusiness
                   </label>
                   <input
                     type="text"
-                    value={printerConfig.stationName}
+                    value={printerConfig.stationName || ''}
                     onChange={e => updatePrinterConfig({ stationName: e.target.value })}
                     placeholder="Ex: Caixa 01 PC, Balcão Principal"
                     className="w-full bg-neutral-950 border border-neutral-800 rounded-xl px-3.5 py-2.5 text-sm text-white focus:border-orange-500 outline-none"
@@ -929,7 +929,7 @@ export const SettingsView: React.FC<SettingsViewProps> = ({ business, onBusiness
                   </label>
                   <input
                     type="text"
-                    value={businessName}
+                    value={businessName || ''}
                     onChange={e => setBusinessName(e.target.value)}
                     className="w-full bg-neutral-950 border border-neutral-800 rounded-xl px-3.5 py-2.5 text-sm text-white focus:border-orange-500 outline-none"
                   />
@@ -941,7 +941,7 @@ export const SettingsView: React.FC<SettingsViewProps> = ({ business, onBusiness
                   </label>
                   <input
                     type="text"
-                    value={businessDoc}
+                    value={businessDoc || ''}
                     onChange={e => setBusinessDoc(e.target.value)}
                     className="w-full bg-neutral-950 border border-neutral-800 rounded-xl px-3.5 py-2.5 text-sm text-white focus:border-orange-500 outline-none"
                   />
@@ -953,7 +953,7 @@ export const SettingsView: React.FC<SettingsViewProps> = ({ business, onBusiness
                   </label>
                   <input
                     type="text"
-                    value={businessPhone}
+                    value={businessPhone || ''}
                     onChange={e => setBusinessPhone(e.target.value)}
                     className="w-full bg-neutral-950 border border-neutral-800 rounded-xl px-3.5 py-2.5 text-sm text-white focus:border-orange-500 outline-none"
                   />
@@ -1075,7 +1075,7 @@ export const SettingsView: React.FC<SettingsViewProps> = ({ business, onBusiness
                 <input
                   type="text"
                   required
-                  value={attendantForm.name}
+                  value={attendantForm.name || ''}
                   onChange={e => setAttendantForm({ ...attendantForm, name: e.target.value })}
                   placeholder="Ex: Carlos Oliveira"
                   className="w-full bg-neutral-950 border border-neutral-800 rounded-xl px-3.5 py-2.5 text-sm text-white focus:border-orange-500 outline-none"
@@ -1092,7 +1092,7 @@ export const SettingsView: React.FC<SettingsViewProps> = ({ business, onBusiness
                   <input
                     type="email"
                     required
-                    value={attendantForm.email}
+                    value={attendantForm.email || ''}
                     onChange={e => setAttendantForm({ ...attendantForm, email: e.target.value })}
                     placeholder="Ex: operador@printfood.com"
                     className="w-full bg-neutral-950 border border-neutral-800 rounded-xl px-3.5 py-2.5 text-sm text-white focus:border-orange-500 outline-none"
@@ -1108,7 +1108,7 @@ export const SettingsView: React.FC<SettingsViewProps> = ({ business, onBusiness
                     <input
                       type={showAttendantPassword ? 'text' : 'password'}
                       required
-                      value={attendantForm.password}
+                      value={attendantForm.password || ''}
                       onChange={e => setAttendantForm({ ...attendantForm, password: e.target.value })}
                       placeholder="Senha do usuário"
                       className="w-full bg-neutral-950 border border-neutral-800 rounded-xl pl-3.5 pr-10 py-2.5 text-sm text-white focus:border-orange-500 outline-none font-mono"

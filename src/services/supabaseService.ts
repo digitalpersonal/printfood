@@ -13,6 +13,46 @@ const LOCAL_PRODUCTS_KEY = 'printfood_local_products';
 const LOCAL_CATEGORIES_KEY = 'printfood_local_categories';
 const LOCAL_ADMIN_AUTH_KEY = 'printfood_admin_auth';
 
+async function saveLocalOrderUnified(newOrder: Order) {
+  try {
+    await saveOrderOffline(newOrder);
+  } catch (e) {
+    console.warn('IndexedDB save failed:', e);
+  }
+  try {
+    const localOrders: Order[] = JSON.parse(localStorage.getItem(LOCAL_ORDERS_KEY) || '[]');
+    const existingIndex = localOrders.findIndex(o => o.id === newOrder.id);
+    if (existingIndex >= 0) {
+      localOrders[existingIndex] = newOrder;
+    } else {
+      localOrders.unshift(newOrder);
+    }
+    localStorage.setItem(LOCAL_ORDERS_KEY, JSON.stringify(localOrders));
+  } catch (e) {
+    console.warn('LocalStorage save failed:', e);
+  }
+}
+
+async function getLocalOrdersUnified(): Promise<Order[]> {
+  let orders: Order[] = [];
+  try {
+    orders = await getOrdersOffline();
+  } catch (e) {
+    console.warn('IndexedDB read failed:', e);
+  }
+  if (!orders || orders.length === 0) {
+    try {
+      const saved = localStorage.getItem(LOCAL_ORDERS_KEY);
+      if (saved) {
+        orders = JSON.parse(saved);
+      }
+    } catch (e) {
+      console.warn('LocalStorage read failed:', e);
+    }
+  }
+  return orders || [];
+}
+
 export const supabaseService = {
   isDemoMode: false,
   lastCleanupTime: 0,
@@ -40,7 +80,7 @@ export const supabaseService = {
     
     if (!this.isDemoMode && isSupabaseConfigured()) {
       try {
-        const { data, error } = await supabase
+        const { data } = await supabase
           .from('business')
           .update({
             name: business.name,
@@ -50,14 +90,91 @@ export const supabaseService = {
           .eq('id', business.id)
           .select()
           .single();
-
-        if (error) throw error;
-        return data;
+        if (data) return data;
       } catch (err) {
-        console.warn('Erro ao atualizar empresa no Supabase, salvando local:', err);
+        console.warn('Supabase business update failed, using local:', err);
       }
     }
     return business;
+  },
+
+  async getCategories(businessId: string, _force?: boolean): Promise<Category[]> {
+    if (this.isDemoMode || !isSupabaseConfigured()) {
+      const saved = localStorage.getItem(LOCAL_CATEGORIES_KEY);
+      return saved ? JSON.parse(saved) : DEFAULT_CATEGORIES;
+    }
+
+    try {
+      const { data, error } = await supabase
+        .from('categories')
+        .select('*')
+        .eq('business_id', businessId)
+        .order('display_order');
+      
+      if (error || !data || data.length === 0) {
+        const saved = localStorage.getItem(LOCAL_CATEGORIES_KEY);
+        return saved ? JSON.parse(saved) : DEFAULT_CATEGORIES;
+      }
+      return data;
+    } catch {
+      const saved = localStorage.getItem(LOCAL_CATEGORIES_KEY);
+      return saved ? JSON.parse(saved) : DEFAULT_CATEGORIES;
+    }
+  },
+
+  async saveCategory(categoryData: {
+    id?: string;
+    business_id: string;
+    name: string;
+    display_order?: number;
+    active?: boolean;
+  }): Promise<Category> {
+    const category: Category = {
+      id: categoryData.id || ('cat-' + Date.now()),
+      business_id: categoryData.business_id,
+      name: categoryData.name.trim(),
+      display_order: Number(categoryData.display_order) || 1,
+      active: categoryData.active !== undefined ? categoryData.active : true
+    };
+    const categories = await this.getCategories(category.business_id);
+    const existingIndex = categories.findIndex(c => c.id === category.id);
+    let updated: Category[];
+    if (existingIndex >= 0) {
+      updated = categories.map(c => c.id === category.id ? category : c);
+    } else {
+      updated = [...categories, category];
+    }
+    localStorage.setItem(LOCAL_CATEGORIES_KEY, JSON.stringify(updated));
+
+    if (!this.isDemoMode && isSupabaseConfigured()) {
+      try {
+        await supabase.from('categories').upsert([category]);
+      } catch (err) {
+        console.warn('Erro ao salvar categoria no Supabase:', err);
+      }
+    }
+
+    window.dispatchEvent(new CustomEvent('printfood:categories-updated', { detail: category }));
+    return category;
+  },
+
+  async deleteCategory(id: string): Promise<boolean> {
+    const categories = JSON.parse(localStorage.getItem(LOCAL_CATEGORIES_KEY) || JSON.stringify(DEFAULT_CATEGORIES));
+    const updated = categories.filter((c: Category) => c.id !== id);
+    localStorage.setItem(LOCAL_CATEGORIES_KEY, JSON.stringify(updated));
+
+    if (!this.isDemoMode && isSupabaseConfigured()) {
+      try {
+        await supabase.from('products').update({ category_id: null }).eq('category_id', id);
+        await supabase.from('categories').delete().eq('id', id);
+      } catch (err) {
+        console.warn('Erro ao deletar categoria no Supabase:', err);
+      }
+    }
+
+    window.dispatchEvent(new CustomEvent('printfood:categories-updated', { detail: { id, deleted: true } }));
+    window.dispatchEvent(new CustomEvent('printfood:products-updated', { detail: { categoryDeleted: id } }));
+    return true;
   },
 
   async seedInitialData(): Promise<{ data: Business | null; error: any }> {
@@ -67,7 +184,6 @@ export const supabaseService = {
     }
 
     try {
-      // 1. Criar empresa PrintFood
       const { data: businessData, error: bError } = await supabase.from('business').insert([{
         name: 'PrintFood - Caixa Central',
         document: '12.345.678/0001-90',
@@ -76,138 +192,91 @@ export const supabaseService = {
 
       if (bError || !businessData) return { data: null, error: bError };
 
-      // 2. Criar categorias
       const categories = [
-        { business_id: businessData.id, name: 'Bebidas', display_order: 1 },
-        { business_id: businessData.id, name: 'Lanches', display_order: 2 },
-        { business_id: businessData.id, name: 'Porções', display_order: 3 },
-        { business_id: businessData.id, name: 'Doces', display_order: 4 },
+        { business_id: businessData.id, name: 'Lanches', display_order: 1, active: true },
+        { business_id: businessData.id, name: 'Bebidas', display_order: 2, active: true },
+        { business_id: businessData.id, name: 'Porções', display_order: 3, active: true },
+        { business_id: businessData.id, name: 'Sobremesas', display_order: 4, active: true }
       ];
-      
+
       const { data: catData, error: cError } = await supabase.from('categories').insert(categories).select();
-      if (cError || !catData) return { data: businessData, error: cError };
+      if (cError) return { data: businessData, error: cError };
 
-      const catBebidas = (catData as any[]).find((c: any) => c.name === 'Bebidas')?.id;
-      const catLanches = (catData as any[]).find((c: any) => c.name === 'Lanches')?.id;
-      const catPorcoes = (catData as any[]).find((c: any) => c.name === 'Porções')?.id;
-
-      // 3. Criar produtos
+      const catMap = new Map(catData?.map((c: any) => [c.name, c.id]) || []);
       const products = [
-        { business_id: businessData.id, category_id: catBebidas, name: 'Água Mineral 500ml', price: 4.00, display_order: 1 },
-        { business_id: businessData.id, category_id: catBebidas, name: 'Refrigerante Lata', price: 7.00, display_order: 2 },
-        { business_id: businessData.id, category_id: catBebidas, name: 'Chopp Artesanal 400ml', price: 14.00, display_order: 3 },
-        { business_id: businessData.id, category_id: catLanches, name: 'Hambúrguer Artesanal', price: 26.00, display_order: 4 },
-        { business_id: businessData.id, category_id: catLanches, name: 'Pastel Especial de Carne', price: 12.00, display_order: 5 },
-        { business_id: businessData.id, category_id: catLanches, name: 'Pastel de Queijo', price: 12.00, display_order: 6 },
-        { business_id: businessData.id, category_id: catPorcoes, name: 'Batata Frita Crocante', price: 28.00, display_order: 7 },
+        { business_id: businessData.id, category_id: catMap.get('Lanches'), name: 'X-Burger Artesanal', description: 'Pão brioche, carne 160g, queijo cheddar e molho especial', price: 28.90, active: true },
+        { business_id: businessData.id, category_id: catMap.get('Lanches'), name: 'X-Salada Bacon', description: 'Pão, carne 160g, queijo, bacon crocante, alface e tomate', price: 34.90, active: true },
+        { business_id: businessData.id, category_id: catMap.get('Bebidas'), name: 'Coca-Cola Lata 350ml', description: 'Gelada', price: 6.50, active: true },
+        { business_id: businessData.id, category_id: catMap.get('Bebidas'), name: 'Suco Natural de Laranja 500ml', description: 'Feito na hora', price: 9.00, active: true },
+        { business_id: businessData.id, category_id: catMap.get('Porções'), name: 'Batata Frita com Cheddar e Bacon', description: 'Porção grande crocante', price: 38.00, active: true }
       ];
 
       await supabase.from('products').insert(products);
-      
+
+      localStorage.setItem(LOCAL_BUSINESS_KEY, JSON.stringify(businessData));
+      if (catData) localStorage.setItem(LOCAL_CATEGORIES_KEY, JSON.stringify(catData));
+
       return { data: businessData, error: null };
     } catch (err) {
-      console.error('Error seeding data:', err);
       return { data: null, error: err };
     }
   },
 
-  getLocalCategories(): Category[] {
-    const saved = localStorage.getItem(LOCAL_CATEGORIES_KEY);
-    if (saved) {
-      try { return JSON.parse(saved); } catch { /* ignore */ }
+  async getProducts(businessId: string, _force?: boolean): Promise<Product[]> {
+    if (this.isDemoMode || !isSupabaseConfigured()) {
+      const saved = localStorage.getItem(LOCAL_PRODUCTS_KEY);
+      return saved ? JSON.parse(saved) : DEFAULT_PRODUCTS;
     }
-    localStorage.setItem(LOCAL_CATEGORIES_KEY, JSON.stringify(DEFAULT_CATEGORIES));
-    return DEFAULT_CATEGORIES;
+
+    try {
+      const { data, error } = await supabase
+        .from('products')
+        .select('*')
+        .eq('business_id', businessId)
+        .order('name');
+      
+      if (error || !data || data.length === 0) {
+        const saved = localStorage.getItem(LOCAL_PRODUCTS_KEY);
+        return saved ? JSON.parse(saved) : DEFAULT_PRODUCTS;
+      }
+      return data;
+    } catch {
+      const saved = localStorage.getItem(LOCAL_PRODUCTS_KEY);
+      return saved ? JSON.parse(saved) : DEFAULT_PRODUCTS;
+    }
   },
 
   getLocalProducts(): Product[] {
     const saved = localStorage.getItem(LOCAL_PRODUCTS_KEY);
-    if (saved) {
-      try { return JSON.parse(saved); } catch { /* ignore */ }
-    }
-    localStorage.setItem(LOCAL_PRODUCTS_KEY, JSON.stringify(DEFAULT_PRODUCTS));
-    return DEFAULT_PRODUCTS;
+    return saved ? JSON.parse(saved) : DEFAULT_PRODUCTS;
   },
 
-  async getCategories(businessId: string, includeInactive: boolean = false): Promise<Category[]> {
-    if (this.isDemoMode || !isSupabaseConfigured()) {
-      const cats = this.getLocalCategories();
-      return includeInactive ? cats : cats.filter(c => c.active !== false);
-    }
-
-    try {
-      let query = supabase
-        .from('categories')
-        .select('*')
-        .eq('business_id', businessId);
-      
-      if (!includeInactive) {
-        query = query.eq('active', true);
-      }
-      
-      const { data, error } = await query.order('display_order');
-      if (error || !data) {
-        const local = this.getLocalCategories();
-        return includeInactive ? local : local.filter(c => c.active !== false);
-      }
-      return data;
-    } catch {
-      const local = this.getLocalCategories();
-      return includeInactive ? local : local.filter(c => c.active !== false);
-    }
-  },
-
-  async getProducts(businessId: string, includeInactive: boolean = false): Promise<Product[]> {
-    if (this.isDemoMode || !isSupabaseConfigured()) {
-      const prods = this.getLocalProducts();
-      return includeInactive ? prods : prods.filter(p => p.active !== false);
-    }
-
-    try {
-      let query = supabase
-        .from('products')
-        .select('*')
-        .eq('business_id', businessId);
-
-      if (!includeInactive) {
-        query = query.eq('active', true);
-      }
-
-      const { data, error } = await query.order('display_order');
-      if (error || !data) {
-        const local = this.getLocalProducts();
-        return includeInactive ? local : local.filter(p => p.active !== false);
-      }
-      return data;
-    } catch {
-      const local = this.getLocalProducts();
-      return includeInactive ? local : local.filter(p => p.active !== false);
-    }
+  getLocalCategories(): Category[] {
+    const saved = localStorage.getItem(LOCAL_CATEGORIES_KEY);
+    return saved ? JSON.parse(saved) : DEFAULT_CATEGORIES;
   },
 
   async saveProduct(productData: {
     id?: string;
     business_id: string;
-    category_id: string | null;
+    category_id?: string | null;
     name: string;
-    price: number;
     description?: string | null;
+    price: number;
     active?: boolean;
     display_order?: number;
   }): Promise<Product> {
-    const isEditing = !!productData.id;
     const cleanProduct: Product = {
       id: productData.id || ('prod-' + Date.now()),
       business_id: productData.business_id,
       category_id: productData.category_id || null,
       name: productData.name.trim(),
-      price: Number(productData.price) || 0,
       description: productData.description?.trim() || null,
+      price: Number(productData.price) || 0,
       active: productData.active !== undefined ? productData.active : true,
       display_order: Number(productData.display_order) || 1
     };
 
-    // Update local storage backup
     const local = this.getLocalProducts();
     const existingIdx = local.findIndex(p => p.id === cleanProduct.id);
     let updatedLocal: Product[];
@@ -221,46 +290,7 @@ export const supabaseService = {
 
     if (!this.isDemoMode && isSupabaseConfigured()) {
       try {
-        if (isEditing) {
-          const { data, error } = await supabase
-            .from('products')
-            .update({
-              category_id: cleanProduct.category_id,
-              name: cleanProduct.name,
-              price: cleanProduct.price,
-              description: cleanProduct.description,
-              active: cleanProduct.active,
-              display_order: cleanProduct.display_order
-            })
-            .eq('id', cleanProduct.id)
-            .select()
-            .single();
-
-          if (!error && data) {
-            window.dispatchEvent(new CustomEvent('printfood:products-updated', { detail: data }));
-            return data;
-          }
-        } else {
-          // If inserting into Supabase, omit custom id if it was client generated, or let Supabase assign UUID
-          const { data, error } = await supabase
-            .from('products')
-            .insert([{
-              business_id: cleanProduct.business_id,
-              category_id: cleanProduct.category_id,
-              name: cleanProduct.name,
-              price: cleanProduct.price,
-              description: cleanProduct.description,
-              active: cleanProduct.active,
-              display_order: cleanProduct.display_order
-            }])
-            .select()
-            .single();
-
-          if (!error && data) {
-            window.dispatchEvent(new CustomEvent('printfood:products-updated', { detail: data }));
-            return data;
-          }
-        }
+        await supabase.from('products').upsert([cleanProduct]);
       } catch (err) {
         console.warn('Fallback to local product saving:', err);
       }
@@ -304,104 +334,12 @@ export const supabaseService = {
     return true;
   },
 
-  async saveCategory(categoryData: {
-    id?: string;
-    business_id: string;
-    name: string;
-    display_order?: number;
-    active?: boolean;
-  }): Promise<Category> {
-    const isEditing = !!categoryData.id;
-    const cleanCat: Category = {
-      id: categoryData.id || ('cat-' + Date.now()),
-      business_id: categoryData.business_id,
-      name: categoryData.name.trim(),
-      display_order: Number(categoryData.display_order) || 1,
-      active: categoryData.active !== undefined ? categoryData.active : true
-    };
-
-    const local = this.getLocalCategories();
-    const existingIdx = local.findIndex(c => c.id === cleanCat.id);
-    let updatedLocal: Category[];
-    if (existingIdx >= 0) {
-      updatedLocal = [...local];
-      updatedLocal[existingIdx] = cleanCat;
-    } else {
-      updatedLocal = [...local, cleanCat];
-    }
-    localStorage.setItem(LOCAL_CATEGORIES_KEY, JSON.stringify(updatedLocal));
-
-    if (!this.isDemoMode && isSupabaseConfigured()) {
-      try {
-        if (isEditing) {
-          const { data, error } = await supabase
-            .from('categories')
-            .update({
-              name: cleanCat.name,
-              display_order: cleanCat.display_order,
-              active: cleanCat.active
-            })
-            .eq('id', cleanCat.id)
-            .select()
-            .single();
-
-          if (!error && data) {
-            window.dispatchEvent(new CustomEvent('printfood:categories-updated', { detail: data }));
-            return data;
-          }
-        } else {
-          const { data, error } = await supabase
-            .from('categories')
-            .insert([{
-              business_id: cleanCat.business_id,
-              name: cleanCat.name,
-              display_order: cleanCat.display_order,
-              active: cleanCat.active
-            }])
-            .select()
-            .single();
-
-          if (!error && data) {
-            window.dispatchEvent(new CustomEvent('printfood:categories-updated', { detail: data }));
-            return data;
-          }
-        }
-      } catch (err) {
-        console.warn('Fallback to local category saving:', err);
-      }
-    }
-
-    window.dispatchEvent(new CustomEvent('printfood:categories-updated', { detail: cleanCat }));
-    return cleanCat;
-  },
-
-  async deleteCategory(id: string): Promise<boolean> {
-    const local = this.getLocalCategories();
-    const filtered = local.filter(c => c.id !== id);
-    localStorage.setItem(LOCAL_CATEGORIES_KEY, JSON.stringify(filtered));
-
-    // Desvincular produtos que pertenciam a esta categoria
-    const localProds = this.getLocalProducts();
-    const updatedProds = localProds.map(p => p.category_id === id ? { ...p, category_id: null } : p);
-    localStorage.setItem(LOCAL_PRODUCTS_KEY, JSON.stringify(updatedProds));
-
-    if (!this.isDemoMode && isSupabaseConfigured()) {
-      try {
-        await supabase.from('products').update({ category_id: null }).eq('category_id', id);
-        await supabase.from('categories').delete().eq('id', id);
-      } catch (err) {
-        console.warn('Erro ao deletar categoria no Supabase:', err);
-      }
-    }
-
-    window.dispatchEvent(new CustomEvent('printfood:categories-updated', { detail: { id, deleted: true } }));
-    window.dispatchEvent(new CustomEvent('printfood:products-updated', { detail: { categoryDeleted: id } }));
-    return true;
-  },
-
   async getTodayOrders(businessId: string): Promise<Order[]> {
     if (this.isDemoMode || !isSupabaseConfigured()) {
-      return await getOrdersOffline();
+      const allOrders = await getLocalOrdersUnified();
+      const today = new Date();
+      today.setHours(0, 0, 0, 0);
+      return allOrders.filter(o => new Date(o.created_at || Date.now()) >= today);
     }
 
     try {
@@ -415,21 +353,27 @@ export const supabaseService = {
         .gte('created_at', today.toISOString())
         .order('created_at', { ascending: false });
       
-      if (data) {
+      if (data && data.length > 0) {
         for (const order of data) {
-          await saveOrderOffline(order);
+          await saveLocalOrderUnified(order);
         }
+        return data;
       }
-      return data || [];
+
+      // If online table is empty or failed, fallback to local unified store
+      const allOrders = await getLocalOrdersUnified();
+      return allOrders.filter(o => new Date(o.created_at || Date.now()) >= today);
     } catch {
-      return await getOrdersOffline();
+      const allOrders = await getLocalOrdersUnified();
+      const today = new Date();
+      today.setHours(0, 0, 0, 0);
+      return allOrders.filter(o => new Date(o.created_at || Date.now()) >= today);
     }
   },
 
   async getAllOrders(businessId: string): Promise<Order[]> {
     if (this.isDemoMode || !isSupabaseConfigured()) {
-      const saved = localStorage.getItem(LOCAL_ORDERS_KEY);
-      return saved ? JSON.parse(saved) : [];
+      return await getLocalOrdersUnified();
     }
 
     try {
@@ -438,10 +382,10 @@ export const supabaseService = {
         .select('*')
         .eq('business_id', businessId)
         .order('created_at', { ascending: false });
-      return data || [];
+      if (data && data.length > 0) return data;
+      return await getLocalOrdersUnified();
     } catch {
-      const saved = localStorage.getItem(LOCAL_ORDERS_KEY);
-      return saved ? JSON.parse(saved) : [];
+      return await getLocalOrdersUnified();
     }
   },
 
@@ -449,9 +393,10 @@ export const supabaseService = {
     orderData: Omit<Order, 'id' | 'created_at' | 'ticket_number'>, 
     items: Omit<OrderItem, 'id' | 'order_id'>[]
   ): Promise<Order | null> {
+    const allOrders = await getLocalOrdersUnified();
+    const nextNumber = String(allOrders.length + 1).padStart(3, '0');
+
     if (this.isDemoMode || !isSupabaseConfigured()) {
-      const orders = await getOrdersOffline();
-      const nextNumber = String(orders.length + 1).padStart(3, '0');
       const newOrder: Order = {
         id: 'ord-' + Date.now(),
         business_id: orderData.business_id,
@@ -464,7 +409,7 @@ export const supabaseService = {
         attendant_name: orderData.attendant_name || null,
         created_at: new Date().toISOString()
       };
-      await saveOrderOffline(newOrder);
+      await saveLocalOrderUnified(newOrder);
       window.dispatchEvent(new CustomEvent('printfood:order-created', { detail: newOrder }));
       return newOrder;
     }
@@ -485,8 +430,7 @@ export const supabaseService = {
 
       if (oError || !order) throw oError;
 
-      // Backup imediato para IndexedDB para proteção contra perda de conexão
-      await saveOrderOffline(order);
+      await saveLocalOrderUnified(order);
 
       const itemsToInsert = items.map(item => ({
         ...item,
@@ -495,11 +439,10 @@ export const supabaseService = {
 
       await supabase.from('order_items').insert(itemsToInsert);
 
+      window.dispatchEvent(new CustomEvent('printfood:order-created', { detail: order }));
       return order;
     } catch (err) {
-      console.warn('Fallback para armazenamento local:', err);
-      const localOrders: Order[] = JSON.parse(localStorage.getItem(LOCAL_ORDERS_KEY) || '[]');
-      const nextNumber = String(localOrders.length + 1).padStart(3, '0');
+      console.warn('Fallback para armazenamento local unificado:', err);
       const newOrder: Order = {
         id: 'ord-' + Date.now(),
         business_id: orderData.business_id,
@@ -512,19 +455,23 @@ export const supabaseService = {
         attendant_name: orderData.attendant_name || null,
         created_at: new Date().toISOString()
       };
-      localOrders.unshift(newOrder);
-      localStorage.setItem(LOCAL_ORDERS_KEY, JSON.stringify(localOrders));
+      await saveLocalOrderUnified(newOrder);
       window.dispatchEvent(new CustomEvent('printfood:order-created', { detail: newOrder }));
       return newOrder;
     }
   },
 
   async updateOrderStatus(orderId: string, newStatus: string): Promise<boolean> {
+    // Always update local unified store first for instant UI reaction
+    const allOrders = await getLocalOrdersUnified();
+    const updatedOrders = allOrders.map(o => o.id === orderId ? { ...o, order_status: newStatus } : o);
+    const targetOrder = updatedOrders.find(o => o.id === orderId);
+    if (targetOrder) {
+      await saveLocalOrderUnified(targetOrder);
+    }
+    window.dispatchEvent(new CustomEvent('printfood:order-updated', { detail: { id: orderId, status: newStatus } }));
+
     if (this.isDemoMode || !isSupabaseConfigured()) {
-      const localOrders: Order[] = JSON.parse(localStorage.getItem(LOCAL_ORDERS_KEY) || '[]');
-      const updated = localOrders.map(o => o.id === orderId ? { ...o, order_status: newStatus } : o);
-      localStorage.setItem(LOCAL_ORDERS_KEY, JSON.stringify(updated));
-      window.dispatchEvent(new CustomEvent('printfood:order-updated', { detail: { id: orderId, status: newStatus } }));
       return true;
     }
 
@@ -532,11 +479,8 @@ export const supabaseService = {
       const { error } = await supabase.from('orders').update({ order_status: newStatus }).eq('id', orderId);
       if (error) throw error;
       return true;
-    } catch {
-      const localOrders: Order[] = JSON.parse(localStorage.getItem(LOCAL_ORDERS_KEY) || '[]');
-      const updated = localOrders.map(o => o.id === orderId ? { ...o, order_status: newStatus } : o);
-      localStorage.setItem(LOCAL_ORDERS_KEY, JSON.stringify(updated));
-      window.dispatchEvent(new CustomEvent('printfood:order-updated', { detail: { id: orderId, status: newStatus } }));
+    } catch (err) {
+      console.warn('Supabase status update failed, local updated:', err);
       return true;
     }
   },
