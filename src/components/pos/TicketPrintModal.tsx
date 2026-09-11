@@ -108,77 +108,78 @@ export const TicketPrintModal: React.FC<TicketPrintModalProps> = ({
     return (
       <div 
         key={uniqueKey}
-        className={`bg-white text-black rounded-xl print-ticket-container ${config.useCompactTemplate ? 'p-2' : 'p-4 sm:p-5'} shadow-lg font-mono text-xs border border-black mb-4 ${
+        className={`bg-white text-black rounded-xl print-ticket-container p-4 sm:p-5 shadow-lg font-mono text-sm border-2 border-black mb-4 ${
           is58mm ? 'w-full max-w-[240px]' : isA4 ? 'w-full max-w-[500px]' : 'w-full max-w-[320px]'
         }`}
       >
         {/* LOGOMARCA & CABEÇALHO */}
-        {!config.useCompactTemplate && (
-          <div className="text-center border-b border-dashed border-black pb-2.5 mb-2.5">
-            <div className="flex items-center justify-center gap-1 text-xl font-black tracking-tight text-black font-['Plus_Jakarta_Sans',sans-serif]">
-              <span>Print</span>
-              <span className="text-black">Food</span>
-            </div>
-            
-            {config.headerCustomText && (
-              <div className="text-[10px] font-black text-black uppercase mt-0.5 tracking-wider">
-                {config.headerCustomText}
-              </div>
-            )}
-
-            <div className="text-[11px] font-black text-black uppercase">
-              {business?.name || 'Caixa Central'}
-            </div>
-            <div className="text-[10px] text-black">
-              {orderDate} às {orderTime}
-            </div>
-            {order.attendant_name && (
-              <div className="text-[10px] font-black text-black">
-                Atendente: {order.attendant_name}
-              </div>
-            )}
-            {copyLabel && (
-              <div className="mt-1 inline-block px-2 py-0.5 bg-neutral-200 text-neutral-800 rounded text-[9px] font-black uppercase">
-                {copyLabel}
-              </div>
-            )}
+        <div className="text-center border-b-2 border-dashed border-black pb-3 mb-3">
+          <div className="flex items-center justify-center gap-1.5 text-2xl font-black tracking-tighter text-black font-['Plus_Jakarta_Sans',sans-serif] mb-1">
+            <span>PRINT</span>
+            <span className="bg-black text-white px-1.5 py-0.5 rounded-md text-lg">FOOD</span>
           </div>
-        )}
+          
+          {config.headerCustomText && (
+            <div className="text-[11px] font-black text-black uppercase mt-0.5 tracking-wider">
+              {config.headerCustomText}
+            </div>
+          )}
 
-        {/* DESTAQUE NÚMERO DA FICHA */}
-        <div className={`text-center ${config.useCompactTemplate ? 'py-1' : 'py-2'} bg-black rounded-lg border border-black mb-3`}>
-          <div className="text-[10px] font-black tracking-widest text-white uppercase">
-            {specificItem ? 'VALE RETIRADA - ITEM' : 'FICHA'} #{order.ticket_number}
+          <div className="text-[12px] font-black text-black uppercase">
+            {business?.name || 'Caixa Central'}
+          </div>
+          <div className="text-[11px] text-black font-semibold">
+            {orderDate} às {orderTime}
+          </div>
+          {order.attendant_name && (
+            <div className="text-[11px] font-black text-black mt-0.5">
+              Atendente: {order.attendant_name}
+            </div>
+          )}
+          {copyLabel && (
+            <div className="mt-1.5 inline-block px-2.5 py-0.5 bg-neutral-200 text-neutral-900 rounded text-[10px] font-black uppercase">
+              {copyLabel}
+            </div>
+          )}
+        </div>
+
+        {/* DESTAQUE NÚMERO DA FICHA (MUITO MAIOR) */}
+        <div className="text-center py-2.5 bg-black rounded-xl border-2 border-black mb-3">
+          <div className="text-[10px] font-black tracking-widest text-white/80 uppercase">
+            {specificItem ? 'VALE RETIRADA - ITEM' : 'FICHA DE CLIENTE'}
+          </div>
+          <div className="text-4xl font-black text-white tracking-wider mt-0.5">
+            #{order.ticket_number}
           </div>
         </div>
 
         {/* CONTEÚDO: SEPARADO POR ITEM OU LISTA COMPLETA */}
         {specificItem ? (
-          <div className="border-b border-dashed border-black pb-2.5 mb-2.5 text-center">
+          <div className="border-b-2 border-dashed border-black pb-3 mb-3 text-center">
             {specificItem.categoryName && (
-              <div className="category-header text-[12px] font-black border-b-2 border-black mb-1 bg-neutral-100 py-0.5">
+              <div className="category-header text-[13px] font-black border-b-2 border-black mb-1 bg-neutral-100 py-0.5">
                 {specificItem.categoryName}
               </div>
             )}
-            <div className={`text-lg font-black text-black ${config.useCompactTemplate ? 'font-mono' : ''}`}>
+            <div className="text-2xl font-black text-black leading-tight">
               {specificItem.quantity}x {specificItem.name}
             </div>
-            <div className="text-[11px] font-black text-black mt-0.5">
+            <div className="text-xs font-black text-black mt-1">
               Valor: {formatMoney(specificItem.total)}
             </div>
           </div>
         ) : (
-          <div className={`border-b border-dashed border-black ${config.useCompactTemplate ? 'pb-1 mb-1' : 'pb-2.5 mb-2.5'} space-y-3`}>
+          <div className="border-b-2 border-dashed border-black pb-3 mb-3 space-y-4">
             {Object.entries(groupedItems).map(([cat, catItems]) => (
-              <div key={cat} className="space-y-1">
-                <div className="category-header text-[12px] font-black border-b-2 border-black mb-1 bg-neutral-100 py-0.5 px-1 flex justify-between items-center">
+              <div key={cat} className="space-y-1.5">
+                <div className="category-header text-[13px] font-black border-b-2 border-black mb-1 bg-neutral-100 py-0.5 px-1 flex justify-between items-center">
                   <span>{cat}</span>
                   <span className="text-[9px] font-normal opacity-70 italic no-print">Seção</span>
                 </div>
                 {catItems.map((item, idx) => (
-                  <div key={idx} className={`flex justify-between items-start text-sm font-black item-row ${config.useCompactTemplate ? 'font-mono' : ''}`}>
-                    <span className="pr-2">
-                      <span className="font-black text-base">{item.quantity}x</span> {item.name}
+                  <div key={idx} className="flex justify-between items-start text-base font-black item-row">
+                    <span className="pr-2 leading-tight">
+                      <span className="font-black text-lg mr-1">{item.quantity}x</span>{item.name}
                     </span>
                     <span className="shrink-0">{formatMoney(item.total)}</span>
                   </div>
@@ -189,16 +190,16 @@ export const TicketPrintModal: React.FC<TicketPrintModalProps> = ({
         )}
 
         {/* TOTAL & FORMA DE PAGAMENTO */}
-        <div className="border-b border-dashed border-black pb-2 mb-2 space-y-0.5">
-          <div className="flex justify-between items-center text-xs font-black text-black">
+        <div className="border-b-2 border-dashed border-black pb-2 mb-2">
+          <div className="flex justify-between items-center text-sm font-black text-black">
             <span>TOTAL:</span>
-            <span className="text-sm">{formatMoney(order.total)}</span>
+            <span className="text-lg">{formatMoney(order.total)}</span>
           </div>
         </div>
 
         {/* MENSAGEM DO RODAPÉ */}
-        <div className="text-center pt-1 text-[10px] font-black text-black uppercase">
-          {config.footerCustomText || '*** APRESENTE ESTA FICHA ***'}
+        <div className="text-center pt-1.5 text-[11px] font-black text-black uppercase tracking-wider">
+          {config.footerCustomText || '*** APRESENTE ESTA FICHA NO BALCÃO ***'}
         </div>
       </div>
     );
