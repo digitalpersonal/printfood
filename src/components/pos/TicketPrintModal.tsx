@@ -206,54 +206,83 @@ export const TicketPrintModal: React.FC<TicketPrintModalProps> = ({
   };
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/85 p-4 backdrop-blur-sm no-print">
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/85 p-4 backdrop-blur-sm">
       <style>{`
         @media print {
+          @page {
+            margin: 0 !important;
+            padding: 0 !important;
+          }
+
+          html, body {
+            margin: 0 !important;
+            padding: 0 !important;
+            width: 100% !important;
+            height: auto !important;
+            background: white !important;
+            visibility: hidden !important;
+          }
+
           /* Esconde absolutamente tudo na página */
           body * {
             visibility: hidden !important;
+            margin: 0 !important;
+            padding: 0 !important;
           }
           
-          /* Garante que o modal e o container da ficha fiquem visíveis */
-          .fixed.inset-0,
+          /* Garante que o modal e o container da ficha fiquem visíveis e ocupem o topo */
+          .fixed.inset-0 {
+            display: block !important;
+            position: absolute !important;
+            left: 0 !important;
+            top: 0 !important;
+            width: 100% !important;
+            padding: 0 !important;
+            margin: 0 !important;
+            visibility: visible !important;
+            background: white !important;
+          }
+
+          .fixed.inset-0 *,
           #printfood-printable-ticket,
           #printfood-printable-ticket * {
             visibility: visible !important;
           }
 
-          /* Posiciona o container da ficha no topo esquerdo absoluto do papel */
           #printfood-printable-ticket {
-            position: absolute !important;
-            left: 0 !important;
-            top: 0 !important;
             width: 100% !important;
             margin: 0 !important;
             padding: 0 !important;
+            display: block !important;
           }
 
-          @page {
-            margin: 0 !important;
-            padding: 0 !important;
-            size: auto;
-          }
-
-          body {
-            margin: 0 !important;
-            padding: 0 !important;
-            background: white !important;
-          }
-
+          /* Estilo da Ficha */
           .print-ticket-container {
             box-shadow: none !important;
-            border: 2px solid black !important;
+            border: 1px solid black !important;
             border-radius: 0 !important;
             width: 100% !important;
             max-width: none !important;
-            margin: 0 0 10px 0 !important;
-            padding: 8px !important;
+            margin: 0 !important;
+            padding: 4px !important;
             page-break-after: always;
             color: black !important;
             display: block !important;
+          }
+
+          /* Força as cores em impressoras térmicas */
+          * {
+            -webkit-print-color-adjust: exact !important;
+            print-color-adjust: exact !important;
+            color: black !important;
+          }
+
+          .bg-black {
+            background-color: black !important;
+          }
+
+          .text-white {
+            color: white !important;
           }
 
           .category-header {
@@ -283,7 +312,9 @@ export const TicketPrintModal: React.FC<TicketPrintModalProps> = ({
           .no-print, 
           button, 
           .bg-neutral-950, 
-          .border-neutral-800 {
+          .border-neutral-800,
+          .bg-neutral-900,
+          .bg-black\/85 {
             display: none !important;
           }
         }
