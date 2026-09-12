@@ -11,6 +11,7 @@ interface TicketPrintModalProps {
   order: Order | null;
   items: { name: string; categoryName?: string; quantity: number; unitPrice: number; total: number }[];
   business: Business | null;
+  autoPrint?: boolean;
 }
 
 export const TicketPrintModal: React.FC<TicketPrintModalProps> = ({
@@ -18,7 +19,8 @@ export const TicketPrintModal: React.FC<TicketPrintModalProps> = ({
   onClose,
   order,
   items,
-  business
+  business,
+  autoPrint
 }) => {
   const [printSuccessMsg, setPrintSuccessMsg] = useState<string | null>(null);
   const [showConfirmClose, setShowConfirmClose] = useState(false);
@@ -37,8 +39,12 @@ export const TicketPrintModal: React.FC<TicketPrintModalProps> = ({
       setShowConfirmClose(false);
       setHasSentRemote(false);
       setPrintSuccessMsg(null);
+      if (autoPrint) {
+        // Auto trigger print without operator intervention
+        setTimeout(() => handlePrint(), 500);
+      }
     }
-  }, [isOpen, order?.id]);
+  }, [isOpen, order?.id, autoPrint]);
 
   const handlePrint = async () => {
     if (!order) return;
@@ -84,7 +90,15 @@ export const TicketPrintModal: React.FC<TicketPrintModalProps> = ({
       setPrintSuccessMsg(config.directPrinting ? 'Enviando para impressora...' : 'Janela de impressão aberta!');
       window.print();
     }
-    setTimeout(() => setPrintSuccessMsg(null), 4000);
+    
+    if (autoPrint) {
+      setTimeout(() => {
+        setPrintSuccessMsg(null);
+        onClose();
+      }, 1500);
+    } else {
+      setTimeout(() => setPrintSuccessMsg(null), 4000);
+    }
   };
 
   if (!isOpen || !order) return null;

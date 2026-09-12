@@ -34,7 +34,8 @@ export default function App() {
   const [incomingRemoteJob, setIncomingRemoteJob] = useState<PrintJob | null>(null);
   const [activePrintJobModal, setActivePrintJobModal] = useState<{
     order: Order;
-    items: { name: string; quantity: number; unitPrice: number; total: number }[];
+    items: { name: string; quantity: number; unitPrice: number; total: number; categoryName?: string }[];
+    autoPrint?: boolean;
   } | null>(null);
 
   const initData = async () => {
@@ -233,7 +234,8 @@ export default function App() {
 
     setActivePrintJobModal({
       order: mockOrder,
-      items: job.items
+      items: job.items,
+      autoPrint: true
     });
     setIncomingRemoteJob(null);
   };
@@ -418,6 +420,7 @@ export default function App() {
           order={activePrintJobModal.order}
           items={activePrintJobModal.items}
           business={business}
+          autoPrint={activePrintJobModal.autoPrint}
         />
       )}
 
