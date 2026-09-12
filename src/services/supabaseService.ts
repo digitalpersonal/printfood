@@ -1,4 +1,4 @@
-import { supabase, isSupabaseConfigured } from '../lib/supabase';
+import { supabase, isSupabaseConfigured, uuidv4 } from '../lib/supabase';
 import { Business, Category, Product, Order, OrderItem, Attendant, PrinterConfig, PrintJob, AdminUser, SystemUser } from '../types';
 import { DEFAULT_BUSINESS, DEFAULT_CATEGORIES, DEFAULT_PRODUCTS, DEFAULT_ATTENDANTS, DEFAULT_PRINTER_CONFIG, DEFAULT_ADMIN, MASTER_ADMIN_CREDENTIALS } from '../data/initialData';
 import { saveOrderOffline, savePrintJobOffline, getOrdersOffline, getPrintJobsOffline } from '../lib/offlineDb';
@@ -130,7 +130,7 @@ export const supabaseService = {
     active?: boolean;
   }): Promise<Category> {
     const category: Category = {
-      id: categoryData.id || ('cat-' + Date.now()),
+      id: categoryData.id || uuidv4(),
       business_id: categoryData.business_id,
       name: categoryData.name.trim(),
       display_order: Number(categoryData.display_order) || 1,
@@ -248,7 +248,7 @@ export const supabaseService = {
     display_order?: number;
   }): Promise<Product> {
     const cleanProduct: Product = {
-      id: productData.id || ('prod-' + Date.now()),
+      id: productData.id || uuidv4(),
       business_id: productData.business_id,
       category_id: productData.category_id || null,
       name: productData.name.trim(),
@@ -379,7 +379,7 @@ export const supabaseService = {
 
     if (this.isDemoMode || !isSupabaseConfigured()) {
       const newOrder: Order = {
-        id: 'ord-' + Date.now(),
+        id: uuidv4(),
         business_id: orderData.business_id,
         ticket_number: nextNumber,
         total: orderData.total,
@@ -425,7 +425,7 @@ export const supabaseService = {
     } catch (err) {
       console.warn('Fallback para armazenamento local unificado:', err);
       const newOrder: Order = {
-        id: 'ord-' + Date.now(),
+        id: uuidv4(),
         business_id: orderData.business_id,
         ticket_number: nextNumber,
         total: orderData.total,
@@ -496,7 +496,7 @@ export const supabaseService = {
   async saveAttendant(attendant: Partial<Attendant> & { business_id: string }): Promise<Attendant | null> {
     const isNew = !attendant.id;
     const attendantToSave: Attendant = {
-      id: attendant.id || 'att-' + Date.now(),
+      id: attendant.id || uuidv4(),
       business_id: attendant.business_id,
       name: attendant.name || 'Novo Atendente',
       email: (attendant.email || '').trim().toLowerCase(),
@@ -623,7 +623,7 @@ export const supabaseService = {
   async dispatchRemotePrintJob(jobData: Omit<PrintJob, 'id' | 'created_at' | 'status'>): Promise<PrintJob> {
     const newJob: PrintJob = {
       ...jobData,
-      id: 'print-' + Date.now() + '-' + Math.random().toString(36).substring(2, 6),
+      id: uuidv4(),
       status: 'pending',
       created_at: new Date().toISOString()
     };
