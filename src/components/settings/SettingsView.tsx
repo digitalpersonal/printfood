@@ -468,7 +468,6 @@ export const SettingsView: React.FC<SettingsViewProps> = ({ business, onBusiness
                     >
                       <option value="80mm">80mm (Padrão Térmica)</option>
                       <option value="58mm">58mm (Bobina Estreita)</option>
-                      <option value="a4">A4 (Impressora Comum / Escritório)</option>
                     </select>
                   </div>
 

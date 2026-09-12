@@ -619,7 +619,11 @@ export const supabaseService = {
     const saved = localStorage.getItem(LOCAL_PRINTER_CONFIG_KEY);
     if (saved) {
       try {
-        return { ...DEFAULT_PRINTER_CONFIG, ...JSON.parse(saved) };
+        const parsed = { ...DEFAULT_PRINTER_CONFIG, ...JSON.parse(saved) };
+        if (parsed.paperWidth !== '58mm' && parsed.paperWidth !== '80mm') {
+          parsed.paperWidth = '80mm';
+        }
+        return parsed;
       } catch {
         return DEFAULT_PRINTER_CONFIG;
       }

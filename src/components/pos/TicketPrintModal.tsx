@@ -31,7 +31,6 @@ export const TicketPrintModal: React.FC<TicketPrintModalProps> = ({
   const isMobileSendToPc = config.targetMode === 'mobile_send_to_pc' || (activeAttendant && activeAttendant.role === 'atendente');
   const copies = config.printCopies || 1;
   const is58mm = config.paperWidth === '58mm';
-  const isA4 = config.paperWidth === 'a4';
 
   useEffect(() => {
     if (isOpen) {
@@ -112,80 +111,82 @@ export const TicketPrintModal: React.FC<TicketPrintModalProps> = ({
     return (
       <div 
         key={uniqueKey}
-        className={`bg-white text-black rounded-xl print-ticket-container p-4 sm:p-5 shadow-lg font-mono text-sm border-2 border-black mb-4 ${
-          is58mm ? 'w-full max-w-[240px]' : isA4 ? 'w-full max-w-[500px]' : 'w-full max-w-[320px]'
+        className={`bg-white text-black rounded-xl print-ticket-container p-3 sm:p-4 shadow-lg font-mono text-sm border-2 border-black mb-4 box-border ${
+          is58mm ? 'w-full max-w-[240px]' : 'w-full max-w-[300px]'
         }`}
       >
         {/* LOGOMARCA & CABEÇALHO */}
-        <div className="text-center border-b-2 border-dashed border-black pb-3 mb-3">
-          <div className="flex items-center justify-center gap-1.5 text-2xl font-black tracking-tighter text-black font-['Plus_Jakarta_Sans',sans-serif] mb-1">
+        <div className="text-center border-b-2 border-dashed border-black pb-2 mb-2.5">
+          <div className="flex items-center justify-center gap-1 text-xl font-black tracking-tighter text-black font-['Plus_Jakarta_Sans',sans-serif] mb-0.5">
             <span>PRINT</span>
-            <span className="bg-black text-white px-1.5 py-0.5 rounded-md text-lg">FOOD</span>
+            <span className="bg-black text-white px-1.5 py-0.5 rounded-md text-base">FOOD</span>
           </div>
           
           {config.headerCustomText && (
-            <div className="text-[11px] font-black text-black uppercase mt-0.5 tracking-wider">
+            <div className="text-[10px] font-black text-black uppercase mt-0.5 tracking-wider">
               {config.headerCustomText}
             </div>
           )}
 
-          <div className="text-[12px] font-black text-black uppercase">
+          <div className="text-[11px] font-black text-black uppercase truncate">
             {business?.name || 'Caixa Central'}
           </div>
-          <div className="text-[11px] text-black font-semibold">
+          <div className="text-[10px] text-black font-semibold">
             {orderDate} às {orderTime}
           </div>
           {order.attendant_name && (
-            <div className="text-[11px] font-black text-black mt-0.5">
+            <div className="text-[10px] font-black text-black mt-0.5">
               Atendente: {order.attendant_name}
             </div>
           )}
           {copyLabel && (
-            <div className="mt-1.5 inline-block px-2.5 py-0.5 bg-neutral-200 text-neutral-900 rounded text-[10px] font-black uppercase">
+            <div className="mt-1 inline-block px-2 py-0.5 bg-neutral-200 text-neutral-900 rounded text-[9px] font-black uppercase">
               {copyLabel}
             </div>
           )}
         </div>
 
         {/* DESTAQUE NÚMERO DA FICHA (MUITO MAIOR) */}
-        <div className="text-center py-2.5 bg-black rounded-xl border-2 border-black mb-3">
-          <div className="text-[10px] font-black tracking-widest text-white/80 uppercase">
+        <div className="text-center py-2 bg-black rounded-xl border-2 border-black mb-2.5">
+          <div className="text-[9px] font-black tracking-widest text-white/80 uppercase">
             {specificItem ? 'VALE RETIRADA - ITEM' : 'FICHA DE CLIENTE'}
           </div>
-          <div className="text-4xl font-black text-white tracking-wider mt-0.5">
+          <div className="text-3xl sm:text-4xl font-black text-white tracking-wider mt-0.5">
             #{order.ticket_number}
           </div>
         </div>
 
         {/* CONTEÚDO: SEPARADO POR ITEM OU LISTA COMPLETA */}
         {specificItem ? (
-          <div className="border-b-2 border-dashed border-black pb-3 mb-3 text-center">
+          <div className="border-b-2 border-dashed border-black pb-2.5 mb-2.5 text-center">
             {specificItem.categoryName && (
-              <div className="category-header text-sm font-black border-b-2 border-black mb-1.5 bg-neutral-200 py-1">
+              <div className="category-header text-xs font-black border-b-2 border-black mb-1.5 bg-neutral-200 py-0.5 px-1">
                 {specificItem.categoryName}
               </div>
             )}
-            <div className="text-4xl font-black text-black leading-tight">
-              {specificItem.quantity}x {specificItem.name}
+            <div className="text-2xl sm:text-3xl font-black text-black leading-tight break-words">
+              <span className="text-3xl sm:text-4xl mr-1.5">{specificItem.quantity}x</span>
+              {specificItem.name}
             </div>
-            <div className="text-xl font-black text-black mt-2">
+            <div className="text-lg font-black text-black mt-1.5">
               Valor: {formatMoney(specificItem.total)}
             </div>
           </div>
         ) : (
-          <div className="border-b-2 border-dashed border-black pb-3 mb-3 space-y-4">
+          <div className="border-b-2 border-dashed border-black pb-2.5 mb-2.5 space-y-3">
             {Object.entries(groupedItems).map(([cat, catItems]) => (
-              <div key={cat} className="space-y-2">
-                <div className="category-header text-sm font-black border-b-2 border-black mb-1.5 bg-neutral-200 py-1 px-1.5 flex justify-between items-center">
+              <div key={cat} className="space-y-1.5">
+                <div className="category-header text-xs font-black border-b-2 border-black mb-1 bg-neutral-200 py-0.5 px-1.5 flex justify-between items-center">
                   <span>{cat}</span>
-                  <span className="text-[10px] font-normal opacity-70 italic no-print">Seção</span>
+                  <span className="text-[9px] font-normal opacity-70 italic no-print">Seção</span>
                 </div>
                 {catItems.map((item, idx) => (
-                  <div key={idx} className="flex justify-between items-start text-xl font-black item-row py-1">
-                    <span className="pr-2 leading-tight">
-                      <span className="font-black text-3xl mr-2">{item.quantity}x</span>{item.name}
+                  <div key={idx} className="flex justify-between items-start text-base font-black item-row py-0.5">
+                    <span className="pr-1.5 leading-snug flex-1 break-words">
+                      <span className="font-black text-xl mr-1.5">{item.quantity}x</span>
+                      {item.name}
                     </span>
-                    <span className="shrink-0 text-xl">{formatMoney(item.total)}</span>
+                    <span className="shrink-0 text-sm sm:text-base whitespace-nowrap pl-1">{formatMoney(item.total)}</span>
                   </div>
                 ))}
               </div>
@@ -194,15 +195,15 @@ export const TicketPrintModal: React.FC<TicketPrintModalProps> = ({
         )}
 
         {/* TOTAL & FORMA DE PAGAMENTO */}
-        <div className="border-b-2 border-dashed border-black pb-2.5 mb-2.5">
-          <div className="flex justify-between items-center text-base font-black text-black">
+        <div className="border-b-2 border-dashed border-black pb-2 mb-2">
+          <div className="flex justify-between items-center text-sm sm:text-base font-black text-black">
             <span>TOTAL:</span>
-            <span className="text-xl">{formatMoney(order.total)}</span>
+            <span className="text-lg sm:text-xl">{formatMoney(order.total)}</span>
           </div>
         </div>
 
         {/* MENSAGEM DO RODAPÉ */}
-        <div className="text-center pt-1.5 text-[11px] font-black text-black uppercase tracking-wider">
+        <div className="text-center pt-1 text-[10px] font-black text-black uppercase tracking-wider">
           {config.footerCustomText || '*** APRESENTE ESTA FICHA NO BALCÃO ***'}
         </div>
       </div>

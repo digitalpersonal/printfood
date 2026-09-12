@@ -67,7 +67,7 @@ export interface Attendant {
 }
 
 export type PrintTargetMode = 'local' | 'mobile_send_to_pc' | 'pc_spooler_server';
-export type PrinterPaperWidth = '58mm' | '80mm' | 'a4';
+export type PrinterPaperWidth = '58mm' | '80mm';
 export type PrinterType = 'browser' | 'network' | 'bluetooth' | 'escpos_usb';
 
 export interface PrinterConfig {
