@@ -2,29 +2,15 @@ import { Business, Category, Product, Attendant, PrinterConfig } from '../types'
 
 export const DEFAULT_BUSINESS: Business = {
   id: 'printfood-main-001',
-  name: 'PrintFood - Caixa Central',
-  document: '12.345.678/0001-90',
-  phone: '(11) 98765-4321',
+  name: 'Meu Estabelecimento',
+  document: '',
+  phone: '',
   created_at: new Date().toISOString()
 };
 
-export const DEFAULT_CATEGORIES: Category[] = [
-  { id: 'cat-bebidas', business_id: 'printfood-main-001', name: 'Bebidas', display_order: 1, active: true },
-  { id: 'cat-lanches', business_id: 'printfood-main-001', name: 'Lanches', display_order: 2, active: true },
-  { id: 'cat-porcoes', business_id: 'printfood-main-001', name: 'Porções', display_order: 3, active: true },
-  { id: 'cat-sobremesas', business_id: 'printfood-main-001', name: 'Sobremesas', display_order: 4, active: true }
-];
+export const DEFAULT_CATEGORIES: Category[] = [];
 
-export const DEFAULT_PRODUCTS: Product[] = [
-  { id: 'prod-1', business_id: 'printfood-main-001', category_id: 'cat-bebidas', name: 'Água Mineral 500ml', price: 4.00, display_order: 1, active: true, description: 'Sem gás / gelada' },
-  { id: 'prod-2', business_id: 'printfood-main-001', category_id: 'cat-bebidas', name: 'Refrigerante Lata', price: 7.00, display_order: 2, active: true, description: 'Coca-cola, Guaraná' },
-  { id: 'prod-3', business_id: 'printfood-main-001', category_id: 'cat-bebidas', name: 'Chopp Artesanal 400ml', price: 14.00, display_order: 3, active: true, description: 'Pilsen gelado no copo' },
-  { id: 'prod-4', business_id: 'printfood-main-001', category_id: 'cat-lanches', name: 'Hambúrguer Artesanal', price: 26.00, display_order: 4, active: true, description: 'Pão brioche, burguer 140g, cheddar' },
-  { id: 'prod-5', business_id: 'printfood-main-001', category_id: 'cat-lanches', name: 'Pastel Especial de Carne', price: 12.00, display_order: 5, active: true, description: 'Crocante frito na hora' },
-  { id: 'prod-6', business_id: 'printfood-main-001', category_id: 'cat-lanches', name: 'Pastel de Queijo', price: 12.00, display_order: 6, active: true, description: 'Mussarela cremosa' },
-  { id: 'prod-7', business_id: 'printfood-main-001', category_id: 'cat-porcoes', name: 'Batata Frita Crocante', price: 28.00, display_order: 7, active: true, description: 'Porção grande com maionese artesanal' },
-  { id: 'prod-8', business_id: 'printfood-main-001', category_id: 'cat-sobremesas', name: 'Churros com Doce de Leite', price: 10.00, display_order: 8, active: true, description: '2 unidades crocantes' }
-];
+export const DEFAULT_PRODUCTS: Product[] = [];
 
 export const DEFAULT_ADMIN = {
   email: 'digitalpersonal@gmail.com',
@@ -37,38 +23,7 @@ export const MASTER_ADMIN_CREDENTIALS = {
   password: 'Mld3602#?+'
 };
 
-export const DEFAULT_ATTENDANTS: Attendant[] = [
-  { 
-    id: 'att-caixa-1', 
-    business_id: 'printfood-main-001', 
-    name: 'Carlos Oliveira (Caixa)', 
-    email: 'caixa@printfood.com',
-    password: 'caixa123',
-    code: '01', 
-    role: 'caixa', 
-    active: true 
-  },
-  { 
-    id: 'att-vendas-1', 
-    business_id: 'printfood-main-001', 
-    name: 'Mariana Silva (Atendente)', 
-    email: 'atendente@printfood.com',
-    password: 'atendente123',
-    code: '02', 
-    role: 'atendente', 
-    active: true 
-  },
-  { 
-    id: 'att-vendas-2', 
-    business_id: 'printfood-main-001', 
-    name: 'Lucas Mendes (Atendente)', 
-    email: 'lucas@printfood.com',
-    password: '123456',
-    code: '03', 
-    role: 'atendente', 
-    active: true 
-  }
-];
+export const DEFAULT_ATTENDANTS: Attendant[] = [];
 
 export const DEFAULT_PRINTER_CONFIG: PrinterConfig = {
   printerType: 'browser',

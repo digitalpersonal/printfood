@@ -43,9 +43,29 @@ export default function App() {
     setIsLoading(true);
     setErrorMessage(null);
 
-    const wasDemo = localStorage.getItem('printfood_is_demo_mode') === 'true';
+    // Detectar e limpar quaisquer dados de exemplo/demo antigos salvos no localStorage do navegador do usuário
+    const hasOldDemoData = 
+      localStorage.getItem('printfood_local_business')?.includes('PrintFood') ||
+      localStorage.getItem('printfood_local_categories')?.includes('cat-bebidas') ||
+      localStorage.getItem('printfood_local_products')?.includes('prod-1') ||
+      localStorage.getItem('printfood_local_products')?.includes('X-Burger') ||
+      localStorage.getItem('printfood_local_attendants')?.includes('att-caixa-1');
 
-    if (!isSupabaseConfigured() || wasDemo) {
+    if (hasOldDemoData) {
+      localStorage.removeItem('printfood_local_business');
+      localStorage.removeItem('printfood_local_categories');
+      localStorage.removeItem('printfood_local_products');
+      localStorage.removeItem('printfood_local_attendants');
+      localStorage.removeItem('printfood_local_cart');
+      localStorage.removeItem('printfood_active_attendant');
+    }
+
+    // Forçar conexão real ao Supabase agora que as credenciais de produção foram cadastradas.
+    // Removemos o desvio do "wasDemo" para garantir que o sistema não tente abrir em demo-mode se o Supabase estiver configurado.
+    localStorage.removeItem('printfood_is_demo_mode');
+    supabaseService.setDemoMode(false);
+
+    if (!isSupabaseConfigured()) {
       supabaseService.setDemoMode(true);
       
       let savedBusiness = localStorage.getItem('printfood_local_business');

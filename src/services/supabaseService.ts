@@ -111,11 +111,11 @@ export const supabaseService = {
         .eq('business_id', businessId)
         .order('display_order');
       
-      if (error || !data || data.length === 0) {
+      if (error) {
         const saved = localStorage.getItem(LOCAL_CATEGORIES_KEY);
         return saved ? JSON.parse(saved) : DEFAULT_CATEGORIES;
       }
-      return data;
+      return data || [];
     } catch {
       const saved = localStorage.getItem(LOCAL_CATEGORIES_KEY);
       return saved ? JSON.parse(saved) : DEFAULT_CATEGORIES;
@@ -185,36 +185,17 @@ export const supabaseService = {
 
     try {
       const { data: businessData, error: bError } = await supabase.from('business').insert([{
-        name: 'PrintFood - Caixa Central',
-        document: '12.345.678/0001-90',
-        phone: '(11) 98765-4321'
+        name: 'Meu Estabelecimento',
+        document: '',
+        phone: ''
       }]).select().single();
 
       if (bError || !businessData) return { data: null, error: bError };
 
-      const categories = [
-        { business_id: businessData.id, name: 'Lanches', display_order: 1, active: true },
-        { business_id: businessData.id, name: 'Bebidas', display_order: 2, active: true },
-        { business_id: businessData.id, name: 'Porções', display_order: 3, active: true },
-        { business_id: businessData.id, name: 'Sobremesas', display_order: 4, active: true }
-      ];
-
-      const { data: catData, error: cError } = await supabase.from('categories').insert(categories).select();
-      if (cError) return { data: businessData, error: cError };
-
-      const catMap = new Map(catData?.map((c: any) => [c.name, c.id]) || []);
-      const products = [
-        { business_id: businessData.id, category_id: catMap.get('Lanches'), name: 'X-Burger Artesanal', description: 'Pão brioche, carne 160g, queijo cheddar e molho especial', price: 28.90, active: true },
-        { business_id: businessData.id, category_id: catMap.get('Lanches'), name: 'X-Salada Bacon', description: 'Pão, carne 160g, queijo, bacon crocante, alface e tomate', price: 34.90, active: true },
-        { business_id: businessData.id, category_id: catMap.get('Bebidas'), name: 'Coca-Cola Lata 350ml', description: 'Gelada', price: 6.50, active: true },
-        { business_id: businessData.id, category_id: catMap.get('Bebidas'), name: 'Suco Natural de Laranja 500ml', description: 'Feito na hora', price: 9.00, active: true },
-        { business_id: businessData.id, category_id: catMap.get('Porções'), name: 'Batata Frita com Cheddar e Bacon', description: 'Porção grande crocante', price: 38.00, active: true }
-      ];
-
-      await supabase.from('products').insert(products);
-
       localStorage.setItem(LOCAL_BUSINESS_KEY, JSON.stringify(businessData));
-      if (catData) localStorage.setItem(LOCAL_CATEGORIES_KEY, JSON.stringify(catData));
+      localStorage.setItem(LOCAL_CATEGORIES_KEY, JSON.stringify([]));
+      localStorage.setItem(LOCAL_PRODUCTS_KEY, JSON.stringify([]));
+      localStorage.setItem(LOCAL_ATTENDANTS_KEY, JSON.stringify([]));
 
       return { data: businessData, error: null };
     } catch (err) {
@@ -235,11 +216,11 @@ export const supabaseService = {
         .eq('business_id', businessId)
         .order('name');
       
-      if (error || !data || data.length === 0) {
+      if (error) {
         const saved = localStorage.getItem(LOCAL_PRODUCTS_KEY);
         return saved ? JSON.parse(saved) : DEFAULT_PRODUCTS;
       }
-      return data;
+      return data || [];
     } catch {
       const saved = localStorage.getItem(LOCAL_PRODUCTS_KEY);
       return saved ? JSON.parse(saved) : DEFAULT_PRODUCTS;
@@ -501,11 +482,11 @@ export const supabaseService = {
         .eq('business_id', businessId)
         .order('name');
       
-      if (error || !data || data.length === 0) {
+      if (error) {
         const saved = localStorage.getItem(LOCAL_ATTENDANTS_KEY);
         return saved ? JSON.parse(saved) : DEFAULT_ATTENDANTS;
       }
-      return data;
+      return data || [];
     } catch {
       const saved = localStorage.getItem(LOCAL_ATTENDANTS_KEY);
       return saved ? JSON.parse(saved) : DEFAULT_ATTENDANTS;
@@ -586,7 +567,7 @@ export const supabaseService = {
 
   getActiveAttendant(): Attendant | null {
     const saved = localStorage.getItem(LOCAL_ACTIVE_ATTENDANT_KEY);
-    return saved ? JSON.parse(saved) : DEFAULT_ATTENDANTS[0];
+    return saved ? JSON.parse(saved) : (DEFAULT_ATTENDANTS[0] || null);
   },
 
   setActiveAttendant(attendant: Attendant | null) {

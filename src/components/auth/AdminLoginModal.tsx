@@ -233,46 +233,20 @@ export const AdminLoginModal: React.FC<AdminLoginModalProps> = ({
           {/* BOTÕES DE AUTO-PREENCHIMENTO PARA TESTES / DEMO */}
           <div className="pt-1">
             <span className="text-[11px] font-semibold text-neutral-400 block mb-1.5">
-              Preenchimento rápido (contas padrão cadastradas):
+              Preenchimento rápido (Conta Administrador Geral):
             </span>
-            <div className="grid grid-cols-3 gap-1.5">
+            <div className="grid grid-cols-1">
               <button
                 type="button"
                 onClick={() => handleQuickFill('master')}
-                className="p-2 bg-neutral-950 hover:bg-neutral-800 border border-neutral-800 rounded-xl text-left transition flex flex-col group"
+                className="p-3 bg-neutral-950 hover:bg-neutral-800 border border-neutral-800 rounded-xl text-left transition flex flex-col group"
                 title="digitalpersonal@gmail.com"
               >
-                <div className="flex items-center gap-1 text-[11px] font-bold text-orange-400 group-hover:text-orange-300">
-                  <ShieldCheck className="w-3 h-3" />
-                  <span>Admin Geral</span>
+                <div className="flex items-center gap-2 text-xs font-bold text-orange-400 group-hover:text-orange-300">
+                  <ShieldCheck className="w-4 h-4" />
+                  <span>Administrador Geral (Clique para preencher)</span>
                 </div>
-                <span className="text-[9px] text-neutral-500 truncate">digitalpersonal...</span>
-              </button>
-
-              <button
-                type="button"
-                onClick={() => handleQuickFill('caixa')}
-                className="p-2 bg-neutral-950 hover:bg-neutral-800 border border-neutral-800 rounded-xl text-left transition flex flex-col group"
-                title="caixa@printfood.com (Admin)"
-              >
-                <div className="flex items-center gap-1 text-[11px] font-bold text-amber-400 group-hover:text-amber-300">
-                  <Briefcase className="w-3 h-3" />
-                  <span>Caixa (Admin)</span>
-                </div>
-                <span className="text-[9px] text-neutral-500 truncate">caixa@printfood.com</span>
-              </button>
-
-              <button
-                type="button"
-                onClick={() => handleQuickFill('atendente')}
-                className="p-2 bg-neutral-950 hover:bg-neutral-800 border border-neutral-800 rounded-xl text-left transition flex flex-col group"
-                title="atendente@printfood.com (Apenas PDV)"
-              >
-                <div className="flex items-center gap-1 text-[11px] font-bold text-blue-400 group-hover:text-blue-300">
-                  <User className="w-3 h-3" />
-                  <span>Atendente PDV</span>
-                </div>
-                <span className="text-[9px] text-neutral-500 truncate">atendente@printfood...</span>
+                <span className="text-[10px] text-neutral-500 mt-0.5 font-mono">digitalpersonal@gmail.com</span>
               </button>
             </div>
           </div>
