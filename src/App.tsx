@@ -13,7 +13,7 @@ import { RemoteJobAlert } from './components/pos/RemoteJobAlert';
 import { TicketPrintModal } from './components/pos/TicketPrintModal';
 import { AdminLoginModal } from './components/auth/AdminLoginModal';
 import { PrintFoodLogo } from './components/common/PrintFoodLogo';
-import { SQL_SCHEMA_SCRIPT, DEFAULT_BUSINESS, DEFAULT_CATEGORIES, DEFAULT_PRODUCTS } from './data/initialData';
+import { SQL_SCHEMA_SCRIPT, DEFAULT_BUSINESS, DEFAULT_CATEGORIES, DEFAULT_PRODUCTS, DEFAULT_ATTENDANTS } from './data/initialData';
 import { playBeep } from './lib/sound';
 
 export default function App() {
@@ -43,8 +43,39 @@ export default function App() {
     setIsLoading(true);
     setErrorMessage(null);
 
-    if (!isSupabaseConfigured()) {
-      setIsConnected(false);
+    const wasDemo = localStorage.getItem('printfood_is_demo_mode') === 'true';
+
+    if (!isSupabaseConfigured() || wasDemo) {
+      supabaseService.setDemoMode(true);
+      
+      let savedBusiness = localStorage.getItem('printfood_local_business');
+      let savedCategories = localStorage.getItem('printfood_local_categories');
+      let savedProducts = localStorage.getItem('printfood_local_products');
+      let savedAttendants = localStorage.getItem('printfood_local_attendants');
+
+      if (!savedBusiness) {
+        localStorage.setItem('printfood_local_business', JSON.stringify(DEFAULT_BUSINESS));
+        savedBusiness = JSON.stringify(DEFAULT_BUSINESS);
+      }
+      if (!savedCategories) {
+        localStorage.setItem('printfood_local_categories', JSON.stringify(DEFAULT_CATEGORIES));
+        savedCategories = JSON.stringify(DEFAULT_CATEGORIES);
+      }
+      if (!savedProducts) {
+        localStorage.setItem('printfood_local_products', JSON.stringify(DEFAULT_PRODUCTS));
+        savedProducts = JSON.stringify(DEFAULT_PRODUCTS);
+      }
+      if (!savedAttendants) {
+        localStorage.setItem('printfood_local_attendants', JSON.stringify(DEFAULT_ATTENDANTS));
+        savedAttendants = JSON.stringify(DEFAULT_ATTENDANTS);
+      }
+
+      setBusiness(JSON.parse(savedBusiness));
+      setCategories(JSON.parse(savedCategories));
+      setProducts(JSON.parse(savedProducts));
+      
+      setIsConnected(true);
+      setIsDemo(true);
       setIsLoading(false);
       return;
     }
@@ -106,9 +137,33 @@ export default function App() {
 
   const handleStartDemo = () => {
     supabaseService.setDemoMode(true);
-    setBusiness(DEFAULT_BUSINESS);
-    setCategories(DEFAULT_CATEGORIES);
-    setProducts(DEFAULT_PRODUCTS);
+    localStorage.setItem('printfood_is_demo_mode', 'true');
+    
+    let savedBusiness = localStorage.getItem('printfood_local_business');
+    let savedCategories = localStorage.getItem('printfood_local_categories');
+    let savedProducts = localStorage.getItem('printfood_local_products');
+    let savedAttendants = localStorage.getItem('printfood_local_attendants');
+
+    if (!savedBusiness) {
+      localStorage.setItem('printfood_local_business', JSON.stringify(DEFAULT_BUSINESS));
+      savedBusiness = JSON.stringify(DEFAULT_BUSINESS);
+    }
+    if (!savedCategories) {
+      localStorage.setItem('printfood_local_categories', JSON.stringify(DEFAULT_CATEGORIES));
+      savedCategories = JSON.stringify(DEFAULT_CATEGORIES);
+    }
+    if (!savedProducts) {
+      localStorage.setItem('printfood_local_products', JSON.stringify(DEFAULT_PRODUCTS));
+      savedProducts = JSON.stringify(DEFAULT_PRODUCTS);
+    }
+    if (!savedAttendants) {
+      localStorage.setItem('printfood_local_attendants', JSON.stringify(DEFAULT_ATTENDANTS));
+      savedAttendants = JSON.stringify(DEFAULT_ATTENDANTS);
+    }
+
+    setBusiness(JSON.parse(savedBusiness));
+    setCategories(JSON.parse(savedCategories));
+    setProducts(JSON.parse(savedProducts));
     setIsDemo(true);
     setIsConnected(true);
   };

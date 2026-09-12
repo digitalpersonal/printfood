@@ -201,5 +201,22 @@ BEGIN
   END IF;
 END $$;
 
+-- 4. Habilitar Replicação em Tempo Real para fila de impressão (Realtime)
+ALTER TABLE print_jobs REPLICA IDENTITY FULL;
+
+DO $$
+BEGIN
+  IF NOT EXISTS (SELECT 1 FROM pg_publication WHERE pubname = 'supabase_realtime') THEN
+    CREATE PUBLICATION supabase_realtime;
+  END IF;
+  
+  -- Adiciona a tabela à publicação para que os canais realtime funcionem
+  ALTER PUBLICATION supabase_realtime ADD TABLE print_jobs;
+EXCEPTION
+  WHEN OTHERS THEN
+    -- Ignora erro caso a tabela já pertença à publicação
+    NULL;
+END $$;
+
 NOTIFY pgrst, 'reload schema';
 `;
