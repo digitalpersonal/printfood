@@ -486,7 +486,19 @@ export const supabaseService = {
         const saved = localStorage.getItem(LOCAL_ATTENDANTS_KEY);
         return saved ? JSON.parse(saved) : DEFAULT_ATTENDANTS;
       }
-      return data || [];
+
+      // Mescla com cache local para recuperar email/senha se a tabela do Supabase não possuir essas colunas
+      const localAttendants: Attendant[] = JSON.parse(localStorage.getItem(LOCAL_ATTENDANTS_KEY) || '[]');
+      const mergedData = (data || []).map((att: any) => {
+        const local = localAttendants.find(l => l.id === att.id);
+        return {
+          ...att,
+          email: att.email || (local && local.email) || `${att.name.toLowerCase().replace(/\s+/g, '')}@printfood.com`,
+          password: att.password || (local && local.password) || '123456'
+        };
+      });
+
+      return mergedData;
     } catch {
       const saved = localStorage.getItem(LOCAL_ATTENDANTS_KEY);
       return saved ? JSON.parse(saved) : DEFAULT_ATTENDANTS;
@@ -495,12 +507,13 @@ export const supabaseService = {
 
   async saveAttendant(attendant: Partial<Attendant> & { business_id: string }): Promise<Attendant | null> {
     const isNew = !attendant.id;
+    const attendantId = attendant.id || uuidv4();
     const attendantToSave: Attendant = {
-      id: attendant.id || uuidv4(),
+      id: attendantId,
       business_id: attendant.business_id,
       name: attendant.name || 'Novo Atendente',
-      email: (attendant.email || '').trim().toLowerCase(),
-      password: attendant.password || '',
+      email: (attendant.email || '').trim().toLowerCase() || `${(attendant.name || '').toLowerCase().replace(/\s+/g, '')}@printfood.com`,
+      password: attendant.password || '123456',
       code: attendant.code || String(Math.floor(10 + Math.random() * 90)),
       role: attendant.role === 'caixa' ? 'caixa' : 'atendente',
       active: attendant.active !== undefined ? attendant.active : true,
@@ -523,14 +536,56 @@ export const supabaseService = {
       let result;
       if (isNew) {
         const { data, error } = await supabase.from('attendants').insert([attendantToSave]).select().single();
-        if (error) throw error;
-        result = data;
+        if (error) {
+          // Auto-healer: se falhar por falta da coluna email/senha no Supabase, limpa e tenta novamente
+          if (error.code === '42703' || (error.message && (error.message.includes('column') || error.message.includes('email') || error.message.includes('password')))) {
+            console.warn('Tabela attendants não possui coluna email ou password no Supabase. Salvando de forma compatível.');
+            const cleanAttendant = { ...attendantToSave };
+            delete (cleanAttendant as any).email;
+            delete (cleanAttendant as any).password;
+            
+            const { data: retryData, error: retryError } = await supabase.from('attendants').insert([cleanAttendant]).select().single();
+            if (retryError) throw retryError;
+            result = { ...retryData, email: attendantToSave.email, password: attendantToSave.password };
+          } else {
+            throw error;
+          }
+        } else {
+          result = data;
+        }
       } else {
         const { data, error } = await supabase.from('attendants').update(attendantToSave).eq('id', attendantToSave.id).select().single();
-        if (error) throw error;
-        result = data;
+        if (error) {
+          // Auto-healer: se falhar por falta da coluna email/senha no Supabase, limpa e tenta novamente
+          if (error.code === '42703' || (error.message && (error.message.includes('column') || error.message.includes('email') || error.message.includes('password')))) {
+            console.warn('Tabela attendants não possui coluna email ou password no Supabase. Atualizando de forma compatível.');
+            const cleanAttendant = { ...attendantToSave };
+            delete (cleanAttendant as any).email;
+            delete (cleanAttendant as any).password;
+
+            const { data: retryData, error: retryError } = await supabase.from('attendants').update(cleanAttendant).eq('id', attendantToSave.id).select().single();
+            if (retryError) throw retryError;
+            result = { ...retryData, email: attendantToSave.email, password: attendantToSave.password };
+          } else {
+            throw error;
+          }
+        } else {
+          result = data;
+        }
       }
-      return result;
+
+      // Garante salvamento no cache local para preservar e-mail e senha no dispositivo
+      const localAttendants: Attendant[] = JSON.parse(localStorage.getItem(LOCAL_ATTENDANTS_KEY) || '[]');
+      const index = localAttendants.findIndex(a => a.id === result.id);
+      const fullResult = { ...result, email: attendantToSave.email, password: attendantToSave.password };
+      if (index >= 0) {
+        localAttendants[index] = fullResult;
+      } else {
+        localAttendants.push(fullResult);
+      }
+      localStorage.setItem(LOCAL_ATTENDANTS_KEY, JSON.stringify(localAttendants));
+
+      return fullResult;
     } catch (err) {
       console.warn('Fallback local para salvar atendente:', err);
       const attendants: Attendant[] = JSON.parse(localStorage.getItem(LOCAL_ATTENDANTS_KEY) || JSON.stringify(DEFAULT_ATTENDANTS));
