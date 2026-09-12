@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
 import { isSupabaseConfigured } from './lib/supabase';
 import { supabaseService } from './services/supabaseService';
-import { Database, AlertCircle, Loader2, Copy, Check, RefreshCw, PlayCircle } from 'lucide-react';
+import { Database, AlertCircle, Loader2, Copy, Check, RefreshCw } from 'lucide-react';
 import { Business, Category, Product, PrintJob, Order, AdminUser } from './types';
 import { Navbar, NavTab } from './components/layout/Navbar';
 import { POSView } from './components/pos/POSView';
@@ -13,7 +13,7 @@ import { RemoteJobAlert } from './components/pos/RemoteJobAlert';
 import { TicketPrintModal } from './components/pos/TicketPrintModal';
 import { AdminLoginModal } from './components/auth/AdminLoginModal';
 import { PrintFoodLogo } from './components/common/PrintFoodLogo';
-import { SQL_SCHEMA_SCRIPT, DEFAULT_BUSINESS, DEFAULT_CATEGORIES, DEFAULT_PRODUCTS, DEFAULT_ATTENDANTS } from './data/initialData';
+import { SQL_SCHEMA_SCRIPT } from './data/initialData';
 import { playBeep } from './lib/sound';
 
 export default function App() {
@@ -66,36 +66,8 @@ export default function App() {
     supabaseService.setDemoMode(false);
 
     if (!isSupabaseConfigured()) {
-      supabaseService.setDemoMode(true);
-      
-      let savedBusiness = localStorage.getItem('printfood_local_business');
-      let savedCategories = localStorage.getItem('printfood_local_categories');
-      let savedProducts = localStorage.getItem('printfood_local_products');
-      let savedAttendants = localStorage.getItem('printfood_local_attendants');
-
-      if (!savedBusiness) {
-        localStorage.setItem('printfood_local_business', JSON.stringify(DEFAULT_BUSINESS));
-        savedBusiness = JSON.stringify(DEFAULT_BUSINESS);
-      }
-      if (!savedCategories) {
-        localStorage.setItem('printfood_local_categories', JSON.stringify(DEFAULT_CATEGORIES));
-        savedCategories = JSON.stringify(DEFAULT_CATEGORIES);
-      }
-      if (!savedProducts) {
-        localStorage.setItem('printfood_local_products', JSON.stringify(DEFAULT_PRODUCTS));
-        savedProducts = JSON.stringify(DEFAULT_PRODUCTS);
-      }
-      if (!savedAttendants) {
-        localStorage.setItem('printfood_local_attendants', JSON.stringify(DEFAULT_ATTENDANTS));
-        savedAttendants = JSON.stringify(DEFAULT_ATTENDANTS);
-      }
-
-      setBusiness(JSON.parse(savedBusiness));
-      setCategories(JSON.parse(savedCategories));
-      setProducts(JSON.parse(savedProducts));
-      
-      setIsConnected(true);
-      setIsDemo(true);
+      setIsConnected(false);
+      setIsDemo(false);
       setIsLoading(false);
       return;
     }
@@ -155,38 +127,7 @@ export default function App() {
     initData();
   }, []);
 
-  const handleStartDemo = () => {
-    supabaseService.setDemoMode(true);
-    localStorage.setItem('printfood_is_demo_mode', 'true');
-    
-    let savedBusiness = localStorage.getItem('printfood_local_business');
-    let savedCategories = localStorage.getItem('printfood_local_categories');
-    let savedProducts = localStorage.getItem('printfood_local_products');
-    let savedAttendants = localStorage.getItem('printfood_local_attendants');
 
-    if (!savedBusiness) {
-      localStorage.setItem('printfood_local_business', JSON.stringify(DEFAULT_BUSINESS));
-      savedBusiness = JSON.stringify(DEFAULT_BUSINESS);
-    }
-    if (!savedCategories) {
-      localStorage.setItem('printfood_local_categories', JSON.stringify(DEFAULT_CATEGORIES));
-      savedCategories = JSON.stringify(DEFAULT_CATEGORIES);
-    }
-    if (!savedProducts) {
-      localStorage.setItem('printfood_local_products', JSON.stringify(DEFAULT_PRODUCTS));
-      savedProducts = JSON.stringify(DEFAULT_PRODUCTS);
-    }
-    if (!savedAttendants) {
-      localStorage.setItem('printfood_local_attendants', JSON.stringify(DEFAULT_ATTENDANTS));
-      savedAttendants = JSON.stringify(DEFAULT_ATTENDANTS);
-    }
-
-    setBusiness(JSON.parse(savedBusiness));
-    setCategories(JSON.parse(savedCategories));
-    setProducts(JSON.parse(savedProducts));
-    setIsDemo(true);
-    setIsConnected(true);
-  };
 
   const handleCopySql = () => {
     navigator.clipboard.writeText(SQL_SCHEMA_SCRIPT);
@@ -434,19 +375,6 @@ export default function App() {
             </div>
           )}
 
-          {/* DEMO MODE OPTION */}
-          <div className="pt-2 border-t border-neutral-800 text-center">
-            <button
-              onClick={handleStartDemo}
-              className="w-full py-3 px-4 bg-gradient-to-r from-orange-600/20 to-amber-600/20 hover:from-orange-600/30 hover:to-amber-600/30 border border-orange-500/40 text-orange-400 hover:text-orange-300 rounded-2xl font-bold text-sm flex items-center justify-center gap-2 transition"
-            >
-              <PlayCircle className="w-5 h-5" />
-              <span>Experimentar Agora no Modo Demonstração</span>
-            </button>
-            <p className="text-[11px] text-neutral-500 mt-2">
-              Teste todas as funcionalidades do PDV, pedidos, fichas e painéis instantaneamente.
-            </p>
-          </div>
         </div>
       </div>
     );
@@ -463,24 +391,7 @@ export default function App() {
         onAdminLogout={handleAdminLogout}
       />
 
-      {isDemo && (
-        <div className="bg-amber-950/40 border-b border-amber-900/50 px-4 py-1.5 flex items-center justify-between text-xs text-amber-300">
-          <div className="flex items-center gap-2 font-semibold">
-            <span className="w-2 h-2 rounded-full bg-amber-400 animate-pulse"></span>
-            <span>Modo Demonstração Ativo (Dados salvos localmente)</span>
-          </div>
-          <button
-            onClick={() => {
-              supabaseService.setDemoMode(false);
-              setIsDemo(false);
-              initData();
-            }}
-            className="text-[11px] font-bold underline hover:text-white"
-          >
-            Tentar conectar com Supabase
-          </button>
-        </div>
-      )}
+
       
       <main className="flex-1 flex flex-col">
         {currentTab === 'pdv' && (
