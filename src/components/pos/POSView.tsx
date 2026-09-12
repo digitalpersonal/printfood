@@ -224,54 +224,73 @@ export const POSView: React.FC<POSViewProps> = ({ business, categories, products
           </div>
 
           {/* ATENDENTE & MODO DA ESTAÇÃO */}
-          <div className="flex items-center gap-2 shrink-0">
+          <div className="flex flex-col gap-1.5 shrink-0">
             {/* Seletor de Atendente */}
-            <div className="flex items-center gap-1.5 bg-neutral-900 px-3 py-2 rounded-xl border border-neutral-800 text-xs">
-              <Users className="w-3.5 h-3.5 text-orange-400" />
-              <span className="text-neutral-400 font-semibold hidden md:inline">Operador:</span>
+            <div className="flex items-center gap-1.5 bg-neutral-900 px-3 py-1.5 rounded-xl border border-neutral-800 text-xs">
+              <Users className="w-3.5 h-3.5 text-orange-400 shrink-0" />
+              <span className="text-neutral-400 font-semibold text-[11px]">Operador:</span>
               <select
                 value={activeAttendant?.id || ''}
                 onChange={e => {
-                  const chosen = allAttendants.find(a => a.id === e.target.value);
-                  if (chosen) {
-                    supabaseService.setActiveAttendant(chosen);
-                    setActiveAttendant(chosen);
+                  const val = e.target.value;
+                  if (!val) {
+                    supabaseService.setActiveAttendant(null);
+                    setActiveAttendant(null);
+                  } else {
+                    const chosen = allAttendants.find(a => a.id === val);
+                    if (chosen) {
+                      supabaseService.setActiveAttendant(chosen);
+                      setActiveAttendant(chosen);
+                    }
                   }
                 }}
-                className="bg-transparent text-white font-bold outline-none cursor-pointer text-xs"
+                className="bg-transparent text-white font-bold outline-none cursor-pointer text-xs flex-1 truncate"
               >
-                <option value="" className="bg-neutral-900">Caixa Central</option>
+                <option value="" className="bg-neutral-900">🖥️ Caixa Central (PC)</option>
                 {allAttendants.map(a => (
                   <option key={a.id} value={a.id} className="bg-neutral-900">
-                    {a.name} ({a.code})
+                    📱 {a.name} ({a.code})
                   </option>
                 ))}
               </select>
             </div>
 
-            {/* Modo de Impressão */}
+            {/* Modo de Impressão Rápido (Abaixo do Nome do Operador) */}
             <div 
-              title={`Modo da Estação: ${
-                printerConfig.targetMode === 'mobile_send_to_pc' 
-                  ? 'Celular transmitindo fichas para o PC' 
-                  : printerConfig.targetMode === 'pc_spooler_server' 
-                  ? 'PC Central escutando e imprimindo de celulares' 
-                  : 'Impressão local direta'
-              }`}
-              className={`flex items-center gap-1.5 px-3 py-2 rounded-xl border text-xs font-bold ${
+              title="Perfil deste aparelho: altere com um toque entre Celular (Móvel -> PC) e PC Caixa (Local)"
+              className={`flex items-center gap-1.5 px-3 py-1.5 rounded-xl border text-xs font-bold transition ${
                 printerConfig.targetMode === 'mobile_send_to_pc'
-                  ? 'bg-blue-950/40 text-blue-400 border-blue-900/60'
+                  ? 'bg-blue-950/60 text-blue-300 border-blue-800'
                   : printerConfig.targetMode === 'pc_spooler_server'
-                  ? 'bg-orange-950/40 text-orange-400 border-orange-900/60'
-                  : 'bg-neutral-900 text-neutral-300 border-neutral-800'
+                  ? 'bg-purple-950/60 text-purple-300 border-purple-800'
+                  : 'bg-neutral-900 text-neutral-300 border-neutral-800 hover:border-neutral-700'
               }`}
             >
-              {printerConfig.targetMode === 'mobile_send_to_pc' && <Smartphone className="w-3.5 h-3.5" />}
-              {printerConfig.targetMode === 'pc_spooler_server' && <Monitor className="w-3.5 h-3.5" />}
-              {printerConfig.targetMode === 'local' && <Printer className="w-3.5 h-3.5" />}
-              <span className="hidden sm:inline">
-                {printerConfig.targetMode === 'mobile_send_to_pc' ? 'Móvel → PC' : printerConfig.targetMode === 'pc_spooler_server' ? 'PC Spooler' : 'Local'}
-              </span>
+              {printerConfig.targetMode === 'mobile_send_to_pc' && <Smartphone className="w-3.5 h-3.5 text-blue-400 shrink-0" />}
+              {printerConfig.targetMode === 'pc_spooler_server' && <Monitor className="w-3.5 h-3.5 text-purple-400 shrink-0" />}
+              {printerConfig.targetMode === 'local' && <Printer className="w-3.5 h-3.5 text-neutral-400 shrink-0" />}
+              
+              <span className="text-neutral-400 font-semibold text-[11px]">Perfil:</span>
+              <select
+                value={printerConfig.targetMode || 'local'}
+                onChange={async (e) => {
+                  const newMode = e.target.value as any;
+                  const updated = { ...printerConfig, targetMode: newMode };
+                  await supabaseService.savePrinterConfig(updated);
+                  setPrinterConfig(updated);
+                }}
+                className={`bg-transparent font-bold outline-none cursor-pointer text-xs flex-1 truncate ${
+                  printerConfig.targetMode === 'mobile_send_to_pc'
+                    ? 'text-blue-300'
+                    : printerConfig.targetMode === 'pc_spooler_server'
+                    ? 'text-purple-300'
+                    : 'text-neutral-200'
+                }`}
+              >
+                <option value="local" className="bg-neutral-950 text-white">PC Caixa (Local)</option>
+                <option value="mobile_send_to_pc" className="bg-neutral-950 text-white">📱 Celular (Móvel → PC)</option>
+                <option value="pc_spooler_server" className="bg-neutral-950 text-white">🖥️ Servidor Spooler</option>
+              </select>
             </div>
           </div>
         </div>

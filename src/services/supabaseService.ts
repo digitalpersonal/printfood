@@ -592,8 +592,22 @@ export const supabaseService = {
   setActiveAttendant(attendant: Attendant | null) {
     if (!attendant) {
       localStorage.removeItem(LOCAL_ACTIVE_ATTENDANT_KEY);
+      // Sem atendente específico (Caixa Central), restaura perfil local se estava como celular
+      const currentConfig = this.getPrinterConfig();
+      if (currentConfig.targetMode === 'mobile_send_to_pc') {
+        this.savePrinterConfig({ ...currentConfig, targetMode: 'local' });
+      }
     } else {
       localStorage.setItem(LOCAL_ACTIVE_ATTENDANT_KEY, JSON.stringify(attendant));
+      // Se for um atendente cadastrado (celular), configura automaticamente o perfil como Móvel -> PC
+      const currentConfig = this.getPrinterConfig();
+      if (attendant.role === 'atendente' || attendant.id !== 'att-caixa-1') {
+        this.savePrinterConfig({
+          ...currentConfig,
+          targetMode: 'mobile_send_to_pc',
+          stationName: `Celular (${attendant.name})`
+        });
+      }
     }
     window.dispatchEvent(new CustomEvent('printfood:attendant-changed', { detail: attendant }));
   },

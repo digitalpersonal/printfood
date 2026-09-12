@@ -22,7 +22,9 @@ import {
   Mail,
   Briefcase,
   User,
-  Database
+  Database,
+  Smartphone,
+  Monitor
 } from 'lucide-react';
 import { Business, Attendant, PrinterConfig, AdminUser } from '../../types';
 import { supabaseService } from '../../services/supabaseService';
@@ -324,6 +326,107 @@ export const SettingsView: React.FC<SettingsViewProps> = ({ business, onBusiness
         {/* ==================================================== */}
         {activeTab === 'printer' && (
           <div className="space-y-6">
+            {/* SELETOR DE MODO DESTE DISPOSITIVO */}
+            <div className="bg-neutral-900 border border-neutral-800 rounded-3xl p-5 sm:p-6 shadow-sm space-y-4">
+              <div>
+                <span className="text-xs font-bold text-orange-400 uppercase tracking-wider">
+                  Perfil deste Aparelho
+                </span>
+                <h2 className="text-lg font-black text-white mt-0.5">
+                  Como este dispositivo será utilizado?
+                </h2>
+                <p className="text-xs text-neutral-400 mt-1 leading-relaxed">
+                  Defina o papel deste aparelho no restaurante ou evento. Você pode alternar a qualquer momento.
+                </p>
+              </div>
+
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-3 pt-1">
+                {/* Opção 1: Local / PC */}
+                <button
+                  type="button"
+                  onClick={() => updatePrinterConfig({ targetMode: 'local' })}
+                  className={`p-4 rounded-2xl border text-left flex flex-col justify-between transition-all cursor-pointer ${
+                    printerConfig.targetMode === 'local'
+                      ? 'bg-orange-950/30 border-orange-500 ring-2 ring-orange-500/30'
+                      : 'bg-neutral-950/60 border-neutral-800 hover:border-neutral-700'
+                  }`}
+                >
+                  <div className="flex items-center justify-between mb-3">
+                    <div className={`p-2.5 rounded-xl ${printerConfig.targetMode === 'local' ? 'bg-orange-500 text-neutral-950' : 'bg-neutral-800 text-neutral-400'}`}>
+                      <Printer className="w-5 h-5" />
+                    </div>
+                    {printerConfig.targetMode === 'local' && (
+                      <span className="px-2 py-0.5 rounded-full text-[10px] font-black bg-orange-500 text-neutral-950 uppercase">
+                        Ativo
+                      </span>
+                    )}
+                  </div>
+                  <div>
+                    <h3 className="text-sm font-black text-white">PC com Impressora Local</h3>
+                    <p className="text-[11px] text-neutral-400 mt-1 leading-normal">
+                      Computador ou notebook com cabo USB/Rede ou impressora padrão. Imprime diretamente ao clicar para emitir a ficha.
+                    </p>
+                  </div>
+                </button>
+
+                {/* Opção 2: Celular Móvel -> PC */}
+                <button
+                  type="button"
+                  onClick={() => updatePrinterConfig({ targetMode: 'mobile_send_to_pc' })}
+                  className={`p-4 rounded-2xl border text-left flex flex-col justify-between transition-all cursor-pointer ${
+                    printerConfig.targetMode === 'mobile_send_to_pc'
+                      ? 'bg-blue-950/30 border-blue-500 ring-2 ring-blue-500/30'
+                      : 'bg-neutral-950/60 border-neutral-800 hover:border-neutral-700'
+                  }`}
+                >
+                  <div className="flex items-center justify-between mb-3">
+                    <div className={`p-2.5 rounded-xl ${printerConfig.targetMode === 'mobile_send_to_pc' ? 'bg-blue-500 text-white' : 'bg-neutral-800 text-neutral-400'}`}>
+                      <Smartphone className="w-5 h-5" />
+                    </div>
+                    {printerConfig.targetMode === 'mobile_send_to_pc' && (
+                      <span className="px-2 py-0.5 rounded-full text-[10px] font-black bg-blue-500 text-white uppercase">
+                        Ativo
+                      </span>
+                    )}
+                  </div>
+                  <div>
+                    <h3 className="text-sm font-black text-white">Celular (Móvel → PC)</h3>
+                    <p className="text-[11px] text-neutral-400 mt-1 leading-normal">
+                      Smartphone ou tablet de operador volante. Ao clicar no botão de impressão, transmite a comanda pela nuvem para o PC imprimir.
+                    </p>
+                  </div>
+                </button>
+
+                {/* Opção 3: PC Spooler Central */}
+                <button
+                  type="button"
+                  onClick={() => updatePrinterConfig({ targetMode: 'pc_spooler_server' })}
+                  className={`p-4 rounded-2xl border text-left flex flex-col justify-between transition-all cursor-pointer ${
+                    printerConfig.targetMode === 'pc_spooler_server'
+                      ? 'bg-purple-950/30 border-purple-500 ring-2 ring-purple-500/30'
+                      : 'bg-neutral-950/60 border-neutral-800 hover:border-neutral-700'
+                  }`}
+                >
+                  <div className="flex items-center justify-between mb-3">
+                    <div className={`p-2.5 rounded-xl ${printerConfig.targetMode === 'pc_spooler_server' ? 'bg-purple-500 text-white' : 'bg-neutral-800 text-neutral-400'}`}>
+                      <Monitor className="w-5 h-5" />
+                    </div>
+                    {printerConfig.targetMode === 'pc_spooler_server' && (
+                      <span className="px-2 py-0.5 rounded-full text-[10px] font-black bg-purple-500 text-white uppercase">
+                        Ativo
+                      </span>
+                    )}
+                  </div>
+                  <div>
+                    <h3 className="text-sm font-black text-white">Servidor Spooler (PC)</h3>
+                    <p className="text-[11px] text-neutral-400 mt-1 leading-normal">
+                      Computador dedicado a escutar a fila em tempo real e imprimir os pedidos recebidos dos celulares na bobina térmica.
+                    </p>
+                  </div>
+                </button>
+              </div>
+            </div>
+
             <div className="bg-neutral-900 border border-neutral-800 rounded-3xl p-5 sm:p-6 shadow-sm space-y-5">
               <div>
                 <span className="text-xs font-bold text-orange-400 uppercase tracking-wider">
@@ -540,13 +643,18 @@ export const SettingsView: React.FC<SettingsViewProps> = ({ business, onBusiness
                   </div>
                   <div>
                     <h2 className="text-lg font-black text-white">
-                      {activeAttendant?.name || 'Nenhum Atendente Selecionado'}
+                      {activeAttendant?.name || 'Caixa Central (PC)'}
                     </h2>
                     <p className="text-xs text-neutral-400">
                       Código #{activeAttendant?.code || '01'} • Função:{' '}
                       <span className="font-semibold text-neutral-300 uppercase">
                         {activeAttendant?.role || 'Caixa'}
                       </span>
+                      {activeAttendant?.role === 'atendente' && (
+                        <span className="ml-2 px-2 py-0.5 rounded-full text-[10px] font-bold bg-blue-950 text-blue-400 border border-blue-800/60">
+                          📱 Modo Celular Ativo
+                        </span>
+                      )}
                     </p>
                   </div>
                 </div>
@@ -559,16 +667,36 @@ export const SettingsView: React.FC<SettingsViewProps> = ({ business, onBusiness
                   onChange={e => {
                     const chosen = attendants.find(a => a.id === e.target.value);
                     if (chosen) handleSelectActiveAttendant(chosen);
+                    else {
+                      supabaseService.setActiveAttendant(null);
+                      setActiveAttendant(null);
+                    }
                   }}
                   className="bg-neutral-950 border border-neutral-800 rounded-xl px-3.5 py-2.5 text-xs font-bold text-white focus:border-orange-500 outline-none"
                 >
-                  <option value="">Selecione um operador...</option>
+                  <option value="">🖥️ Caixa Central (PC)</option>
                   {attendants.map(a => (
                     <option key={a.id} value={a.id}>
-                      #{a.code} - {a.name} ({a.role})
+                      📱 #{a.code} - {a.name} ({a.role})
                     </option>
                   ))}
                 </select>
+              </div>
+            </div>
+
+            {/* AVISO DO FLUXO CELULAR -> PC & SEM CONFIRMAÇÃO DE EMAIL */}
+            <div className="bg-gradient-to-r from-blue-950/40 via-neutral-900 to-neutral-900 border border-blue-900/40 rounded-2xl p-4 flex items-start gap-3 text-xs text-neutral-300">
+              <Smartphone className="w-5 h-5 text-blue-400 shrink-0 mt-0.5" />
+              <div className="space-y-1">
+                <div className="flex items-center gap-2">
+                  <span className="font-bold text-white block">Atendentes no Celular & Acesso Imediato</span>
+                  <span className="text-[10px] font-bold bg-emerald-950/80 text-emerald-400 border border-emerald-800/60 px-2 py-0.5 rounded-full">
+                    Sem confirmação de e-mail
+                  </span>
+                </div>
+                <p className="text-neutral-400 leading-relaxed">
+                  Todos os usuários cadastrados como <strong>Atendentes</strong> utilizam o celular para PDV e enviam fichas direto para a impressora do Caixa. <strong>Não é necessário confirmar ou verificar e-mail</strong>: ao salvar o usuário com e-mail e senha, o login já fica liberado na hora.
+                </p>
               </div>
             </div>
 
@@ -634,16 +762,16 @@ export const SettingsView: React.FC<SettingsViewProps> = ({ business, onBusiness
                             <div className="p-2 rounded-xl bg-amber-950/40 border border-amber-800/50 flex items-start gap-2 text-[11px] text-amber-300">
                               <Briefcase className="w-3.5 h-3.5 text-amber-400 shrink-0 mt-0.5" />
                               <div>
-                                <span className="font-bold block">Caixa (Administrador)</span>
-                                <span className="text-[10px] text-neutral-400">Acesso a Vendas, Produtos e Relatórios</span>
+                                <span className="font-bold block">Caixa (PC / Central)</span>
+                                <span className="text-[10px] text-neutral-400">Opera no computador, recebe e imprime fichas dos celulares</span>
                               </div>
                             </div>
                           ) : (
                             <div className="p-2 rounded-xl bg-blue-950/40 border border-blue-800/50 flex items-start gap-2 text-[11px] text-blue-300">
-                              <User className="w-3.5 h-3.5 text-blue-400 shrink-0 mt-0.5" />
+                              <Smartphone className="w-3.5 h-3.5 text-blue-400 shrink-0 mt-0.5" />
                               <div>
-                                <span className="font-bold block">Atendente (PDV)</span>
-                                <span className="text-[10px] text-neutral-400">Acesso restrito a efetuar vendas e imprimir</span>
+                                <span className="font-bold block">Atendente (Celular / Móvel)</span>
+                                <span className="text-[10px] text-neutral-400">Usa o celular para PDV e envia fichas para impressão no PC</span>
                               </div>
                             </div>
                           )}
@@ -1085,9 +1213,14 @@ export const SettingsView: React.FC<SettingsViewProps> = ({ business, onBusiness
               {/* EMAIL & SENHA DE ACESSO */}
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                 <div>
-                  <label className="text-xs font-bold text-neutral-300 block mb-1 flex items-center gap-1">
-                    <Mail className="w-3.5 h-3.5 text-orange-400" />
-                    <span>E-mail de Acesso:</span>
+                  <label className="text-xs font-bold text-neutral-300 block mb-1 flex items-center justify-between">
+                    <span className="flex items-center gap-1">
+                      <Mail className="w-3.5 h-3.5 text-orange-400" />
+                      <span>E-mail de Acesso:</span>
+                    </span>
+                    <span className="text-[10px] text-emerald-400 font-semibold bg-emerald-950/60 px-2 py-0.5 rounded-full border border-emerald-800/50">
+                      Sem confirmação
+                    </span>
                   </label>
                   <input
                     type="email"
@@ -1097,6 +1230,9 @@ export const SettingsView: React.FC<SettingsViewProps> = ({ business, onBusiness
                     placeholder="Ex: operador@printfood.com"
                     className="w-full bg-neutral-950 border border-neutral-800 rounded-xl px-3.5 py-2.5 text-sm text-white focus:border-orange-500 outline-none"
                   />
+                  <p className="text-[10px] text-neutral-400 mt-1">
+                    Não requer verificação nem confirmação por e-mail. Ativo imediatamente.
+                  </p>
                 </div>
 
                 <div>

@@ -1,6 +1,6 @@
-import React, { useEffect } from 'react';
+import React, { useEffect, useState } from 'react';
 import { createPortal } from 'react-dom';
-import { Printer, X, ArrowRight, Send } from 'lucide-react';
+import { Printer, X, ArrowRight, Send, Smartphone, Check, CheckCircle2, RefreshCw } from 'lucide-react';
 import { Order, Business, PrinterConfig } from '../../types';
 import { supabaseService } from '../../services/supabaseService';
 import { connectWebUsbPrinter, printViaWebUsb } from '../../lib/webUsbPrinter';
@@ -20,11 +20,15 @@ export const TicketPrintModal: React.FC<TicketPrintModalProps> = ({
   items,
   business
 }) => {
-  const [printSuccessMsg, setPrintSuccessMsg] = React.useState<string | null>(null);
-  const [showConfirmClose, setShowConfirmClose] = React.useState(false);
+  const [printSuccessMsg, setPrintSuccessMsg] = useState<string | null>(null);
+  const [showConfirmClose, setShowConfirmClose] = useState(false);
+  const [hasSentRemote, setHasSentRemote] = useState(false);
+  const [isSendingRemote, setIsSendingRemote] = useState(false);
 
   const config: PrinterConfig = supabaseService.getPrinterConfig();
-  const isMobileSendToPc = config.targetMode === 'mobile_send_to_pc';
+  const activeAttendant = supabaseService.getActiveAttendant();
+  // Se for um atendente cadastrado (ou estiver no modo mobile_send_to_pc), envia direto para o PC
+  const isMobileSendToPc = config.targetMode === 'mobile_send_to_pc' || (activeAttendant && activeAttendant.role === 'atendente');
   const copies = config.printCopies || 1;
   const is58mm = config.paperWidth === '58mm';
   const isA4 = config.paperWidth === 'a4';
@@ -32,25 +36,35 @@ export const TicketPrintModal: React.FC<TicketPrintModalProps> = ({
   useEffect(() => {
     if (isOpen) {
       setShowConfirmClose(false);
+      setHasSentRemote(false);
+      setPrintSuccessMsg(null);
     }
   }, [isOpen, order?.id]);
 
   const handlePrint = async () => {
     if (!order) return;
     if (isMobileSendToPc) {
-      // Simula envio para fila do PC
-      supabaseService.dispatchRemotePrintJob({
-        business_id: business?.id || '',
-        order_id: order.id,
-        ticket_number: order.ticket_number,
-        source_device: 'Mobile (Operador)',
-        attendant_name: order.attendant_name || 'Operador',
-        customer_name: order.customer_name || undefined,
-        items: items.map(i => ({ name: i.name, categoryName: i.categoryName, quantity: i.quantity, unitPrice: i.unitPrice, total: i.total })),
-        total: order.total,
-        payment_method: order.payment_method
-      });
-      setPrintSuccessMsg('Ficha enviada com sucesso para a fila de impressão do Computador!');
+      setIsSendingRemote(true);
+      try {
+        await supabaseService.dispatchRemotePrintJob({
+          business_id: business?.id || '',
+          order_id: order.id,
+          ticket_number: order.ticket_number,
+          source_device: config.stationName || `Celular (${order.attendant_name || 'Operador'})`,
+          attendant_name: order.attendant_name || 'Operador',
+          customer_name: order.customer_name || undefined,
+          items: items.map(i => ({ name: i.name, categoryName: i.categoryName, quantity: i.quantity, unitPrice: i.unitPrice, total: i.total })),
+          total: order.total,
+          payment_method: order.payment_method
+        });
+        setHasSentRemote(true);
+        setPrintSuccessMsg('✅ Ficha transmitida com sucesso para o Computador do Caixa!');
+      } catch (err: any) {
+        console.error('Erro ao enviar ficha para o PC:', err);
+        setPrintSuccessMsg('Erro ao conectar ao servidor. Tente reenviar.');
+      } finally {
+        setIsSendingRemote(false);
+      }
     } else if (config.printerType === 'escpos_usb' && config.usbPrinterVendorId) {
       try {
         setPrintSuccessMsg('Enviando via USB...');
@@ -274,10 +288,28 @@ export const TicketPrintModal: React.FC<TicketPrintModalProps> = ({
 
         {/* STATUS DE DISPARO REMOTO (CELULAR -> PC) */}
         {isMobileSendToPc && (
-          <div className="bg-blue-950/60 border-b border-blue-900/60 px-5 py-2.5 flex items-center gap-2.5 text-xs text-blue-300 font-semibold">
-            <Send className="w-4 h-4 text-blue-400 animate-pulse shrink-0" />
+          <div className={`border-b px-5 py-3 flex items-center gap-3 text-xs font-semibold transition-all ${
+            hasSentRemote
+              ? 'bg-emerald-950/70 border-emerald-800 text-emerald-300'
+              : 'bg-blue-950/70 border-blue-800 text-blue-300'
+          }`}>
+            {hasSentRemote ? (
+              <CheckCircle2 className="w-5 h-5 text-emerald-400 shrink-0" />
+            ) : (
+              <Smartphone className="w-5 h-5 text-blue-400 animate-pulse shrink-0" />
+            )}
             <div>
-              <span className="font-bold text-white">Enviado para a Estação PC!</span> Ficha #{order.ticket_number} transmitida para impressão no computador do caixa.
+              {hasSentRemote ? (
+                <>
+                  <span className="font-bold text-white block text-sm">Ficha Enviada para o PC!</span>
+                  <span>Ficha #{order.ticket_number} transmitida com sucesso para o computador do caixa.</span>
+                </>
+              ) : (
+                <>
+                  <span className="font-bold text-white block text-sm">Modo Celular (Móvel → PC) Ativo</span>
+                  <span>Clique no botão abaixo para enviar esta comanda para impressão no PC do caixa.</span>
+                </>
+              )}
             </div>
           </div>
         )}
@@ -298,15 +330,47 @@ export const TicketPrintModal: React.FC<TicketPrintModalProps> = ({
           )}
 
           <div className="flex gap-3">
-            <button
-              onClick={handlePrint}
-              className="flex-1 py-3.5 px-4 bg-orange-600 hover:bg-orange-500 text-white rounded-2xl font-black text-sm flex items-center justify-center gap-2 transition shadow-lg shadow-orange-950/50"
-            >
-              <Printer className="w-5 h-5" />
-              <span>{isMobileSendToPc ? 'Re-imprimir no Aparelho' : 'Imprimir Ficha'}</span>
-            </button>
+            {isMobileSendToPc ? (
+              <button
+                type="button"
+                onClick={handlePrint}
+                disabled={isSendingRemote}
+                className={`flex-1 py-3.5 px-4 text-white rounded-2xl font-black text-sm flex items-center justify-center gap-2 transition shadow-lg ${
+                  hasSentRemote
+                    ? 'bg-emerald-600 hover:bg-emerald-500 shadow-emerald-950/50'
+                    : 'bg-blue-600 hover:bg-blue-500 shadow-blue-950/50'
+                } ${isSendingRemote ? 'opacity-70 cursor-wait' : ''}`}
+              >
+                {isSendingRemote ? (
+                  <>
+                    <RefreshCw className="w-5 h-5 animate-spin" />
+                    <span>Transmitindo para o PC...</span>
+                  </>
+                ) : hasSentRemote ? (
+                  <>
+                    <Check className="w-5 h-5" />
+                    <span>Reenviar Ficha para o PC</span>
+                  </>
+                ) : (
+                  <>
+                    <Send className="w-5 h-5" />
+                    <span>📤 Enviar para Impressão no PC</span>
+                  </>
+                )}
+              </button>
+            ) : (
+              <button
+                type="button"
+                onClick={handlePrint}
+                className="flex-1 py-3.5 px-4 bg-orange-600 hover:bg-orange-500 text-white rounded-2xl font-black text-sm flex items-center justify-center gap-2 transition shadow-lg shadow-orange-950/50"
+              >
+                <Printer className="w-5 h-5" />
+                <span>Imprimir Ficha</span>
+              </button>
+            )}
             
             <button
+              type="button"
               onClick={() => setShowConfirmClose(true)}
               className="py-3.5 px-5 bg-orange-950/50 hover:bg-orange-900 text-orange-200 rounded-2xl font-bold text-sm flex items-center justify-center gap-2 transition border border-orange-800/50"
             >
@@ -314,6 +378,18 @@ export const TicketPrintModal: React.FC<TicketPrintModalProps> = ({
               <ArrowRight className="w-4 h-4" />
             </button>
           </div>
+
+          {isMobileSendToPc && (
+            <div className="text-center pt-1">
+              <button
+                type="button"
+                onClick={() => window.print()}
+                className="text-[11px] text-neutral-400 hover:text-neutral-200 underline cursor-pointer"
+              >
+                Ou imprimir diretamente neste celular
+              </button>
+            </div>
+          )}
         </div>
 
       </div>
