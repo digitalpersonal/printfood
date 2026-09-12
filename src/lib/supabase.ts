@@ -1,30 +1,14 @@
 import { createClient } from '@supabase/supabase-js';
 
-let rawUrl = import.meta.env.VITE_SUPABASE_URL || '';
-const supabaseKey = import.meta.env.VITE_SUPABASE_ANON_KEY || '';
+// Conexão oficial direta e verificada com o Supabase de Produção
+export const SUPABASE_URL = 'https://etcuknfmwgqkdycmrrba.supabase.co';
+export const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImV0Y3VrbmZtd2dxa2R5Y21ycmJhIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODkwNTY2NzUsImV4cCI6MjEwNDYzMjY3NX0.LsfuQplJukmXB3_fpOtthg060oy5hvb1rbEsCY9pFVY';
 
-// Clean the URL in case the user added /rest/v1 or trailing slashes by mistake
-if (rawUrl && rawUrl.includes('supabase.co')) {
-  try {
-    const urlObj = new URL(rawUrl);
-    rawUrl = `${urlObj.protocol}//${urlObj.host}`;
-  } catch (e) {
-    // ignore invalid URLs here, will be caught below
-  }
-}
+export const isSupabaseConfigured = () => true;
 
-export const isSupabaseConfigured = () => {
-  if (!rawUrl || !supabaseKey) return false;
-  if (rawUrl === 'sua_url_aqui' || supabaseKey === 'sua_chave_anon_aqui') return false;
-  try {
-    new URL(rawUrl);
-    return true;
-  } catch {
-    return false;
-  }
-};
+export const getSupabaseConfig = () => ({
+  url: SUPABASE_URL,
+  key: SUPABASE_ANON_KEY
+});
 
-// Only initialize if configured to prevent crashes on startup
-export const supabase = isSupabaseConfigured() 
-  ? createClient(rawUrl, supabaseKey)
-  : ({} as any);
+export const supabase = createClient(SUPABASE_URL, SUPABASE_ANON_KEY);

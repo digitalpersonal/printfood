@@ -1,7 +1,6 @@
 import { useState, useEffect } from 'react';
-import { isSupabaseConfigured } from './lib/supabase';
 import { supabaseService } from './services/supabaseService';
-import { Database, AlertCircle, Loader2, Copy, Check, RefreshCw } from 'lucide-react';
+import { AlertCircle, Loader2, Copy, Check, RefreshCw } from 'lucide-react';
 import { Business, Category, Product, PrintJob, Order, AdminUser } from './types';
 import { Navbar, NavTab } from './components/layout/Navbar';
 import { POSView } from './components/pos/POSView';
@@ -18,7 +17,6 @@ import { playBeep } from './lib/sound';
 
 export default function App() {
   const [isConnected, setIsConnected] = useState<boolean | null>(null);
-  const [isDemo, setIsDemo] = useState(false);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [copiedSql, setCopiedSql] = useState(false);
   const [business, setBusiness] = useState<Business | null>(null);
@@ -61,16 +59,8 @@ export default function App() {
     }
 
     // Forçar conexão real ao Supabase agora que as credenciais de produção foram cadastradas.
-    // Removemos o desvio do "wasDemo" para garantir que o sistema não tente abrir em demo-mode se o Supabase estiver configurado.
     localStorage.removeItem('printfood_is_demo_mode');
     supabaseService.setDemoMode(false);
-
-    if (!isSupabaseConfigured()) {
-      setIsConnected(false);
-      setIsDemo(false);
-      setIsLoading(false);
-      return;
-    }
 
     try {
       const { data: bData, error: bError } = await supabaseService.getBusiness();
@@ -110,7 +100,6 @@ export default function App() {
         setCategories(cats);
         setProducts(prods);
         setIsConnected(true);
-        setIsDemo(false);
       } else {
         setIsConnected(false);
       }
@@ -311,69 +300,55 @@ export default function App() {
     );
   }
 
-  if ((!isSupabaseConfigured() || !isConnected) && !isDemo) {
+  if (!isConnected) {
     return (
       <div className="min-h-screen bg-neutral-950 text-neutral-100 flex flex-col items-center justify-center p-4">
         <div className="w-full max-w-lg bg-neutral-900 border border-neutral-800 rounded-3xl p-6 sm:p-8 shadow-2xl">
           <PrintFoodLogo size="xl" className="mb-6" />
 
-          {!isSupabaseConfigured() ? (
-            <div className="bg-neutral-950 border border-neutral-800 rounded-2xl p-5 mb-4 text-center">
-              <Database className="w-9 h-9 text-amber-500 mx-auto mb-2" />
-              <h2 className="text-base font-bold text-white mb-1">Configuração do Supabase Pendente</h2>
-              <p className="text-xs text-neutral-400 mb-4">
-                Adicione as variáveis no menu de configurações do AI Studio:
-              </p>
-              <div className="bg-neutral-900 rounded-xl p-3 text-left font-mono text-xs text-neutral-300 border border-neutral-800 space-y-1">
-                <div><span className="text-orange-400">VITE_SUPABASE_URL</span>=https://xyz.supabase.co</div>
-                <div><span className="text-orange-400">VITE_SUPABASE_ANON_KEY</span>=eyJhbGci...</div>
+          <div className="bg-neutral-950 border border-neutral-800 rounded-2xl p-5 mb-4">
+            <div className="flex items-start gap-3 mb-3">
+              <AlertCircle className="w-6 h-6 text-amber-500 shrink-0 mt-0.5" />
+              <div>
+                <h2 className="text-sm font-bold text-white">Falha na Comunicação com o Supabase</h2>
+                <p className="text-xs text-neutral-400 mt-1">
+                  {errorMessage || "As tabelas do sistema ainda não foram criadas ou a conexão falhou."}
+                </p>
               </div>
             </div>
-          ) : (
-            <div className="bg-neutral-950 border border-neutral-800 rounded-2xl p-5 mb-4">
-              <div className="flex items-start gap-3 mb-3">
-                <AlertCircle className="w-6 h-6 text-amber-500 shrink-0 mt-0.5" />
-                <div>
-                  <h2 className="text-sm font-bold text-white">Tabelas não encontradas no Supabase</h2>
-                  <p className="text-xs text-neutral-400 mt-1">
-                    {errorMessage || "As tabelas do sistema ainda não foram criadas no seu banco de dados."}
-                  </p>
-                </div>
-              </div>
 
-              <div className="bg-neutral-900 border border-neutral-800 rounded-xl p-3 mb-3 text-xs text-neutral-300">
-                <span className="font-semibold text-neutral-200">Como resolver em 1 minuto:</span>
-                <ol className="list-decimal list-inside space-y-1 mt-1.5 text-neutral-400">
-                  <li>Clique no botão abaixo para copiar o script SQL;</li>
-                  <li>Abra o <strong>SQL Editor</strong> no painel do seu projeto Supabase;</li>
-                  <li>Cole e clique em <strong>Run</strong>;</li>
-                  <li>Volte aqui e clique em <strong>Tentar Conectar Novamente</strong>.</li>
-                </ol>
-              </div>
-
-              <div className="flex flex-col sm:flex-row gap-2">
-                <button
-                  onClick={handleCopySql}
-                  className={`flex-1 py-2.5 px-4 rounded-xl font-bold text-xs flex items-center justify-center gap-2 transition ${
-                    copiedSql 
-                      ? 'bg-emerald-600 text-white' 
-                      : 'bg-neutral-800 hover:bg-neutral-700 text-neutral-200 border border-neutral-700'
-                  }`}
-                >
-                  {copiedSql ? <Check className="w-4 h-4" /> : <Copy className="w-4 h-4" />}
-                  {copiedSql ? 'Script Copiado!' : 'Copiar Script SQL'}
-                </button>
-
-                <button
-                  onClick={initData}
-                  className="py-2.5 px-4 bg-orange-600 hover:bg-orange-500 text-white rounded-xl font-bold text-xs flex items-center justify-center gap-2 transition shadow-md"
-                >
-                  <RefreshCw className="w-4 h-4" />
-                  Tentar Conectar
-                </button>
-              </div>
+            <div className="bg-neutral-900 border border-neutral-800 rounded-xl p-3 mb-3 text-xs text-neutral-300">
+              <span className="font-semibold text-neutral-200">Como resolver em 1 minuto:</span>
+              <ol className="list-decimal list-inside space-y-1 mt-1.5 text-neutral-400">
+                <li>Clique no botão abaixo para copiar o script SQL;</li>
+                <li>Abra o <strong>SQL Editor</strong> no painel do seu projeto Supabase;</li>
+                <li>Cole e clique em <strong>Run</strong>;</li>
+                <li>Volte aqui e clique em <strong>Tentar Conectar Novamente</strong>.</li>
+              </ol>
             </div>
-          )}
+
+            <div className="flex flex-col sm:flex-row gap-2">
+              <button
+                onClick={handleCopySql}
+                className={`flex-1 py-2.5 px-4 rounded-xl font-bold text-xs flex items-center justify-center gap-2 transition ${
+                  copiedSql 
+                    ? 'bg-emerald-600 text-white' 
+                    : 'bg-neutral-800 hover:bg-neutral-700 text-neutral-200 border border-neutral-700'
+                }`}
+              >
+                {copiedSql ? <Check className="w-4 h-4" /> : <Copy className="w-4 h-4" />}
+                {copiedSql ? 'Script Copiado!' : 'Copiar Script SQL'}
+              </button>
+
+              <button
+                onClick={initData}
+                className="py-2.5 px-4 bg-orange-600 hover:bg-orange-500 text-white rounded-xl font-bold text-xs flex items-center justify-center gap-2 transition shadow-md"
+              >
+                <RefreshCw className="w-4 h-4" />
+                Tentar Conectar
+              </button>
+            </div>
+          </div>
 
         </div>
       </div>
