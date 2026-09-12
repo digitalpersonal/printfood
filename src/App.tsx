@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react';
+import { supabase } from './lib/supabase';
 import { supabaseService } from './services/supabaseService';
 import { AlertCircle, Loader2, Copy, Check, RefreshCw } from 'lucide-react';
 import { Business, Category, Product, PrintJob, Order, AdminUser } from './types';
@@ -186,11 +187,24 @@ export default function App() {
     };
 
     window.addEventListener('printfood:remote-print-job', handleJobEvent);
+    
+    // Inscrição Realtime no Supabase para ser "Instantâneo" igual ao Guarafood
+    const channel = supabase.channel('public:print_jobs')
+      .on(
+        'postgres_changes',
+        { event: 'INSERT', schema: 'public', table: 'print_jobs', filter: `business_id=eq.${business.id}` },
+        () => {
+          checkPendingJobs();
+        }
+      )
+      .subscribe();
+
     const interval = setInterval(checkPendingJobs, 3500);
 
     return () => {
       window.removeEventListener('printfood:remote-print-job', handleJobEvent);
       clearInterval(interval);
+      supabase.removeChannel(channel);
     };
   }, [business]);
 

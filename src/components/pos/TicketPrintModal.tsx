@@ -48,7 +48,9 @@ export const TicketPrintModal: React.FC<TicketPrintModalProps> = ({
 
   const handlePrint = async () => {
     if (!order) return;
-    if (isMobileSendToPc) {
+    
+    // Se NÃO for impressão automática e for um terminal móvel, envia para o PC remoto
+    if (!autoPrint && isMobileSendToPc) {
       setIsSendingRemote(true);
       try {
         await supabaseService.dispatchRemotePrintJob({
