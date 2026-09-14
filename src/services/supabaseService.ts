@@ -327,24 +327,24 @@ export const supabaseService = {
       const today = new Date();
       today.setHours(0, 0, 0, 0);
       
-      const { data } = await supabase
+      const { data, error } = await supabase
         .from('orders')
         .select('*')
         .eq('business_id', businessId)
         .gte('created_at', today.toISOString())
         .order('created_at', { ascending: false });
       
-      if (data && data.length > 0) {
+      if (error) throw error;
+
+      if (data) {
         for (const order of data) {
           await saveLocalOrderUnified(order);
         }
         return data;
       }
-
-      // If online table is empty or failed, fallback to local unified store
-      const allOrders = await getLocalOrdersUnified();
-      return allOrders.filter(o => new Date(o.created_at || Date.now()) >= today);
-    } catch {
+      return [];
+    } catch (err) {
+      console.warn('Erro ao buscar pedidos do dia no Supabase, usando cache local:', err);
       const allOrders = await getLocalOrdersUnified();
       const today = new Date();
       today.setHours(0, 0, 0, 0);
@@ -358,14 +358,16 @@ export const supabaseService = {
     }
 
     try {
-      const { data } = await supabase
+      const { data, error } = await supabase
         .from('orders')
         .select('*')
         .eq('business_id', businessId)
         .order('created_at', { ascending: false });
-      if (data && data.length > 0) return data;
-      return await getLocalOrdersUnified();
-    } catch {
+      if (error) throw error;
+      if (data) return data;
+      return [];
+    } catch (err) {
+      console.warn('Erro ao buscar todos os pedidos no Supabase, usando cache local:', err);
       return await getLocalOrdersUnified();
     }
   },
